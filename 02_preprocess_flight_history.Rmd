@@ -11,91 +11,49 @@ output: html_document
 library(rvest)
 library(tidyverse)
 library(stringr)
+library(xml2)
+source("date_string_formatter.R")
 ```
 
 ## Define Settings
 
 ```{r}
-folder_path_depatures <- "datasets/raw_depatures_dataset"
+folder_path_departures <- "datasets/raw_departures_dataset"
 ```
 
-## Preprocessing of depature flights
+## Preprocessing of departure flights
 
 ```{r}
 # Load the filepaths of all the .html-documents
-html_documents <- list.files(path = folder_path_depatures, pattern = "\\.html$", full.names = TRUE)
+html_documents <- list.files(path = folder_path_departures, pattern = "\\.html$", full.names = TRUE)
 head(html_documents)
 ```
 
 ```{r}
-extract_minutes_from_delay_string <- function(input_string) {
-  input_string <- input_string[length(input_string)]
-  input_string <- trimws(input_string)
-      
-  if (input_string == "on time") {
-    return(0)
-  }
-  # extract all digits in the string
-  numbers <- as.numeric(regmatches(input_string, gregexpr("\\d+", input_string))[[1]])
-
-  # extract all units in the string
-  units <- regmatches(input_string, gregexpr("[a-z]+", input_string))[[1]]
-
-
-  hours <- numbers[units == "h"]
-  minutes <- numbers[units == "min" | units == "m"]
-  
-  if (length(hours) == 0) {
-     hours <- 0
-  }
-  if (length(minutes) == 0) {
-    minutes <- 0
-  }
-  
-  total_minutes <- (hours * 60) + minutes
-  return(total_minutes)
-}
-```
-
-```{r}
-convert_date_string <- function(date_string) {
-  month_codes <- c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
-  date_parts <- unlist(strsplit(date_string, "[,\\. ]+"))
-  
-  day <- as.numeric(date_parts[2])
-  month <- match(date_parts[3], month_codes)
-  year <- as.numeric(date_parts[4])
-  
-  formatted_date <- sprintf("%04d-%02d-%02d", year, month, day)
-  return(formatted_date)
-}
-
-
-```
-
-```{r}
-depature_data <- data.frame(
-  date_depature = character(),
+departure_data <- data.frame(
+  date_departure = character(),
   flight_status = character(),
-  airline_code = character(),
-  IATA_airline_code = character(),
   airline_name = character(),
   flight_number = character(),
-  IATA_flight_number = character(),
-  target_destination_name = character(),
-  target_destination_IATA = character(),
-  target_destination_ICAO = character(),
-  departure_time_local = character(),
-  departure_time_local_timezone = character(),
-  departure_utc_time = character(),
-  departure_utc_time_timezone = character(),
-  actual_departure_time = character(),
-  actual_departure_time_timezone = character(),
-  delay_departure_minutes = numeric(),
-  delay_arrival_minutes = numeric(),
+  flight_number_IATA = character(),
+  airline_code = character(),
+  airline_code_IATA = character(),
+  airline_country = character(),
+  destination_country = character(),
+  destination_name = character(),
+  destination_IATA = character(),
+  destination_ICAO = character(),
+  departure_scheduled_time_local = character(),
+  departure_scheduled_time_local_timezone = character(),
+  departure_scheduled_utc_time = character(),
+  departure_scheduled_utc_time_timezone = character(),
+  departure_actual_time = character(),
+  departure_actual_time_timezone = character(),
+  delay_departure_min = numeric(),
+  delay_arrival_min = numeric(),
   actual_arrival_time = character(),
   actual_arrival_time_timezone = character(),
-  flight_duration_time = numeric()
+  flight_duration_time_min = numeric()
 )
 ```
 
@@ -108,119 +66,132 @@ for (doc_path in html_documents) {
   extracted_data <- doc %>%
     html_nodes("tbody tr.bg-gray-50, tbody tr.bg-white")
   
-  for (element in extracted_data) {
-    child_elements <- element %>%
-      html_children() %>%
-      html_text() %>%
-      trimws() #%>%
-    
-      # There are either one or two flight numbers. The flight number is located before the first two \n\n inside child_elements[2]
-      flight_number <- gsub("\\n\\n.*", "", child_elements[2])
+  for (flight_element in extracted_data) {
+      # let's start by storing all child elements of a flight's flight_element 
+      child_elements_txt <- flight_element %>%
+        html_children() %>%
+        html_text() %>%
+        trimws() # remove whitespaces
+      
+      flag_imgs <- flight_element %>%
+         html_nodes("img[alt*='Flag for']")
+      
+      if (length(flag_imgs) == 3) {
+        print(flag_imgs)
+      }
+
+      # It happens that the airline can not be assigned to a country so that there's no flag icon.
+      # Example: Flight to Liege (Belgium), see here: https://www.flightera.net/en/airport/Munich/EDDM/departure/2017-12-13%2022_00?
+      if (length(flag_imgs) == 1) {
+         airline_country <- NULL
+         destination_country <- str_extract(html_attr(flag_imgs[1], "alt"), "(?<=Flag for ).*")
+      } else {
+         airline_country <- str_extract(html_attr(flag_imgs[1], "alt"), "(?<=Flag for ).*")
+         destination_country <- str_extract(html_attr(flag_imgs[2], "alt"), "(?<=Flag for ).*")
+      }
+     
+      # There are either one or two flight numbers. The flight number is located before the first two \n\n inside child_elements_txt[2]
+      flight_number <- gsub("\\n\\n.*", "", child_elements_txt[2])
       flight_number <- str_extract_all(flight_number, "[A-Z\\d]+")
       
-      airline <- strsplit(child_elements[2], "\n")[[1]]
+      airline <- strsplit(child_elements_txt[2], "\n")[[1]]
       airline <- tail(airline, n = 1)
     
       airline <- strsplit(airline, "/")[[1]]
       airline_code <- tail(strsplit(airline[1], " ")[[1]], n = 1)
-      IATA_airline_code <- airline[2]
+      airline_code_IATA <- airline[2]
       airline_name <- sub("\\s\\S+$", "", airline)[1]
       
-      date_depature <- convert_date_string(strsplit(child_elements[1], "\n")[[1]][1])
-      flight_status <- tail(gsub("\\s+", "",strsplit(child_elements[1], "\n")[[1]]), n = 1)
+      date_departure <- convert_date_string(strsplit(child_elements_txt[1], "\n")[[1]][1])
+      flight_status <- tail(gsub("\\s+", "",strsplit(child_elements_txt[1], "\n")[[1]]), n = 1)
       
-      depature_time_local <- strsplit(child_elements[1], "\n")[[1]][8]
-      depature_time_local_timezone <- strsplit(child_elements[1], "\n")[[1]][9]
+      departure_scheduled_time_local <- strsplit(child_elements_txt[1], "\n")[[1]][8]
+      departure_scheduled_time_local_timezone <- strsplit(child_elements_txt[1], "\n")[[1]][9]
 
       # Extract the time after "\n\n    "
-      depature_utc <- strsplit(child_elements[4], "\n\n    ")[[1]][2]
-      depature_utc_time <- strsplit(depature_utc, " ")[[1]][1]
-      depature_utc_time_timezone <- strsplit(depature_utc, " ")[[1]][2]
+      departure_scheduled_utc <- strsplit(child_elements_txt[4], "\n\n    ")[[1]][2]
+      departure_scheduled_utc_time <- strsplit(departure_scheduled_utc, " ")[[1]][1]
+      departure_scheduled_utc_time_timezone <- strsplit(departure_scheduled_utc, " ")[[1]][2]
       
-      target_destination <- sub(" \\(.*", "", child_elements[3])
+      destination_name <- sub(" \\(.*", "", child_elements_txt[3])
       # str_match returns the second column of these matrices
-      IATA_flight_code <- str_match(child_elements[3], "\\(([A-Z]{3}) /")[, 2]
-      ICAO_flight_code <- str_match(child_elements[3], " / ([A-Z]{4})\\)")[, 2]
+      flight_code_IATA <- str_match(child_elements_txt[3], "\\(([A-Z]{3}) /")[, 2]
+      flight_code_ICAO <- str_match(child_elements_txt[3], " / ([A-Z]{4})\\)")[, 2]
       
       if (flight_status != "Cancelled" & flight_status != "Diverted") {
-        actual_departure_time <- sub("\\n.*", "", child_elements[5])
-        actual_depature_time_timezone <- strsplit(child_elements[5], "\n")[[1]][2]
+        departure_actual_time <- sub("\\n.*", "", child_elements_txt[5])
+        departure_actual_time_timezone <- strsplit(child_elements_txt[5], "\n")[[1]][2]
       
-        delay_depature_split <- strsplit(child_elements[5], "\n")[[1]]
-        delay_depature_minutes <- extract_minutes_from_delay_string(delay_depature_split)
+        delay_departure_split <- strsplit(child_elements_txt[5], "\n")[[1]]
+        delay_departure_min <- extract_minutes_from_delay_string(delay_departure_split)
       
-        delay_arrival_split <- strsplit(child_elements[6], "\n")[[1]]
-        delay_arrival_minutes <- extract_minutes_from_delay_string(delay_arrival_split)
+        delay_arrival_split <- strsplit(child_elements_txt[6], "\n")[[1]]
+        delay_arrival_min <- extract_minutes_from_delay_string(delay_arrival_split)
       
-        actual_arrival_time <- sub("\\n.*", "", child_elements[6])
-        actual_arrival_time_timezone <- strsplit(child_elements[6], "\n")[[1]][2]
+        actual_arrival_time <- sub("\\n.*", "", child_elements_txt[6])
+        actual_arrival_time_timezone <- strsplit(child_elements_txt[6], "\n")[[1]][2]
       
-        flight_duration_time <- extract_minutes_from_delay_string(child_elements[7])
-      } else {
-        actual_departure_time <- NULL
-        actual_depature_time_timezone <- NULL
-      
-        delay_depature_split <- NULL
-        delay_depature_minutes <- NULL
-      
-        delay_arrival_split <- NULL
-        delay_arrival_minutes <- NULL
-      
-        actual_arrival_time <- NULL
-        actual_arrival_time_timezone <- NULL
-      
-        flight_duration_time <- NULL
+        flight_duration_time_min <- extract_minutes_from_delay_string(child_elements_txt[7])
       }
       
-      IATA_flight_number <- flight_number[[1]][2]
+      flight_number_IATA <- flight_number[[1]][2]
       flight_number <- flight_number[[1]][1]
       
-      depature_data <- depature_data %>%
+      departure_data <- departure_data %>%
         add_row(
-          date_depature = ifelse(is.null(date_depature), "", date_depature),
+          date_departure = date_departure,
           airline_code = airline_code,
-          IATA_airline_code = IATA_airline_code,
+          airline_code_IATA = airline_code_IATA,
           airline_name = airline_name,
+          airline_country = airline_country,
           flight_number = flight_number[[1]][1],
-          IATA_flight_number = IATA_flight_number,
-          flight_status = ifelse(is.null(flight_status), "", flight_status),
-          departure_time_local = ifelse(is.null(depature_time_local), "", depature_time_local),
-          departure_time_local_timezone = ifelse(is.null(depature_time_local_timezone), "", depature_time_local_timezone),
-          departure_utc_time = ifelse(is.null(depature_utc_time), "", depature_utc_time),
-          departure_utc_time_timezone = ifelse(is.null(depature_utc_time_timezone), "", depature_utc_time_timezone),
-          actual_departure_time = ifelse(is.null(actual_departure_time), "", actual_departure_time),
-          actual_departure_time_timezone = ifelse(is.null(actual_depature_time_timezone), "", actual_depature_time_timezone),
-          target_destination_name = ifelse(is.null(target_destination), "", target_destination),
-          target_destination_IATA = ifelse(is.null(IATA_flight_code), "", IATA_flight_code),
-          target_destination_ICAO = ifelse(is.null(ICAO_flight_code), "", ICAO_flight_code),
-          delay_departure_minutes = ifelse(is.null(delay_depature_minutes), 0, delay_depature_minutes),
-          delay_arrival_minutes = ifelse(is.null(delay_arrival_minutes), 0, delay_arrival_minutes),
-          actual_arrival_time = ifelse(is.null(actual_arrival_time), "", actual_arrival_time),
-          actual_arrival_time_timezone = ifelse(is.null(actual_arrival_time_timezone), "", actual_arrival_time_timezone),
-          flight_duration_time = ifelse(is.null(flight_duration_time), 0, flight_duration_time)
+          flight_number_IATA = flight_number_IATA,
+          flight_status = flight_status,
+          departure_scheduled_time_local = departure_scheduled_time_local,
+          departure_scheduled_time_local_timezone = departure_scheduled_time_local_timezone,
+          departure_scheduled_utc_time = departure_scheduled_utc_time,
+          departure_scheduled_utc_time_timezone = departure_scheduled_utc_time_timezone,
+          departure_actual_time = departure_actual_time,
+          departure_actual_time_timezone = departure_actual_time_timezone,
+          destination_name = destination_name,
+          destination_IATA = flight_code_IATA,
+          destination_ICAO = flight_code_ICAO,
+          destination_country = destination_country,
+          delay_departure_min = delay_departure_min,
+          delay_arrival_min = delay_arrival_min,
+          actual_arrival_time = actual_arrival_time,
+          actual_arrival_time_timezone = actual_arrival_time_timezone,
+          flight_duration_time_min = flight_duration_time_min
         )
-
   }
 }
 ```
 
 
 ```{r}
-airline <- "Lufthansa EN/DLA"
-airline <- strsplit(airline, "/")[[1]]
-
-airline_code <- tail(strsplit(airline[1], " ")[[1]], n = 1)
-IATA_airline_code <- airline[2]
-airline_name <- sub("\\s\\S+$", "", airline)[1]
-
-print(airline_name)
-print(airline_code)
-print(IATA_airline_code)
+write.csv(departure_data, file = "datasets/departure_dataset.csv", row.names = FALSE)
 ```
 
 ```{r}
-#write.csv(depature_data, file = "departure_data_sample.csv", row.names = FALSE)
+library(ggplot2)
+
+total_flights <- nrow(departure_data)
+
+top_20_destinations <- departure_data %>%
+  count(destination_country) %>%
+  mutate(percentage = (n / total_flights) * 100) %>%
+  arrange(-percentage) %>%
+  head(20)
+
+ggplot(top_20_destinations, aes(x = reorder(destination_country, -percentage), y = percentage)) +
+  geom_bar(stat = "identity", fill = "blue") +
+  xlab("Destination") +
+  ylab("Percentage") +
+  ggtitle("Top 20 Destinations by Percentage") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
 ```
 
-
-
+```{r}
+duplicate_rows <- departure_data[duplicated(departure_data), ]
+```
