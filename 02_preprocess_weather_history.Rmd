@@ -1,0 +1,96 @@
+---
+title: "02 Preprocess Weather History"
+author: "Nils Hellwig"
+date: "5/16/2023"
+output: html_document
+---
+
+## Load Packages
+
+```{r}
+library(rvest)
+library(tidyverse)
+library(stringr)
+library(xml2)
+library(jsonlite)
+```
+
+## Define Settings
+
+```{r}
+folder_path_weather_munich <- "datasets/raw_weather_munich_dataset"
+```
+
+## Preprocessing of departure flights
+
+```{r}
+# Load the filepaths of all the .html-documents
+html_documents <- list.files(path = folder_path_weather_munich, pattern = "\\.html$", full.names = TRUE)
+head(html_documents)
+```
+
+```{r}
+weather_data <- data.frame(
+  ds = character(),
+  icon = numeric(),
+  desc = character(),
+  temp = numeric(),
+  templow = numeric(),
+  baro = numeric(),
+  wind = numeric(),
+  wd = numeric(),
+  hum = numeric()
+)
+```
+
+
+```{r}
+html <- read_html(html_documents[1])
+
+script_tag_inner <- html %>% html_nodes("section.headline-banner__wrap script:nth-child(2)") %>% html_text()
+code <- gsub(".*detail\\: \\[(.*)\\].*", "\\1", script_tag_inner)
+code <- gsub("\n", "", code)
+
+extracted_strings <- str_extract_all(code, "\\{([^\\{\\}]*)\\}")[[1]]
+
+for (weather_data_string in extracted_strings) {
+  weather_row <- data.frame(
+    ds = NA,
+    icon = NA,
+    desc = NA,
+    temp = NA,
+    templow = NA,
+    baro = NA,
+    wind = NA,
+    wd = NA,
+    hum = NA
+  )
+  
+  matches <- str_extract_all(weather_data_string, "(ds|desc): ((\"([^\"]*)\"))")
+
+  for (match in matches[[1]]) {
+    key <- str_extract(match, "ds|desc")
+    value <- str_extract(match, "(: \"([^\"]*)\")")
+    value <- str_replace(value, ": \"", "")
+    value <- str_replace(value, "\"$", "")
+    weather_row[[key]] <- value
+  }
+  
+  matches <- str_extract_all(weather_data_string, "(icon|temp|templow|baro|wind|wd|hum): [0-9]+")
+
+  for (match in matches[[1]]) {
+    key <- str_extract(match, "(icon|temp|templow|baro|wind|wd|hum)")
+    value <- str_extract(match, "(: [0-9]+)")
+    value <- str_replace(value, "\\: ", "")
+    value <- str_replace(value, "\"$", "")
+    weather_row[[key]] <- value
+  }
+  weather_data <- rbind(weather_data, weather_row)
+}
+```
+
+```{r}
+weather_data
+```
+
+

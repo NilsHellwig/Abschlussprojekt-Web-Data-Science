@@ -137,6 +137,7 @@ for (doc_path in html_documents) {
       flight_number_IATA <- flight_number[[1]][2]
       flight_number <- flight_number[[1]][1]
       
+      # Finally, we can add all the extracted information regarding a specific flight to our dataframe
       departure_data <- departure_data %>%
         add_row(
           date_departure = date_departure,

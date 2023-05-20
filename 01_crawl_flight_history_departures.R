@@ -1,7 +1,7 @@
 library(httr)
 library(rvest)
 
-# We first define the URL that serve as the basis for each request. This is either the url for departures or arrivals.
+# We first define the URL that serves as the basis for each request. This is either the url for departures or arrivals.
 base_url_departures <- "https://www.flightera.net/en/airport/Munich/EDDM/departure/"
 
 # These are the days that are available on Flightera.net for both departures and arrivals
