@@ -111,7 +111,7 @@ weather_data
 ## Further preprocessing
 
 ```{r}
-# store the date and time in a seperate column
+# store  date and time in a separate column
 weather_data$ds <- as.POSIXlt(weather_data$ds, format = "%A, %d. %B %Y, %H:%M —")
 weather_data$date <- format(weather_data$ds, "%Y-%m-%d")
 weather_data$six_hours_starting_from <- format(weather_data$ds, "%H:%M")
@@ -134,7 +134,7 @@ names(weather_data)[names(weather_data) == 'icon'] <- 'weather_icon'
 ```
 
 ```{r}
-weather_data
+head(weather_data)
 ```
 
 ```{r}
