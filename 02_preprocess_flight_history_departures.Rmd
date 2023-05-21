@@ -25,7 +25,7 @@ folder_path_departures <- "datasets/raw_departures_dataset"
 
 ```{r}
 # Load the filepaths of all the .html-documents
-html_documents <- list.files(path = folder_path_departures, pattern = "\\.html$", full.names = TRUE)[1:3]
+html_documents <- list.files(path = folder_path_departures, pattern = "\\.html$", full.names = TRUE)
 head(html_documents)
 ```
 
@@ -168,6 +168,10 @@ for (i in seq_along(html_documents)) {
 }
 ```
 
+```{r}
+duplicate_rows <- departure_data[duplicated(departure_data), ]
+departure_data <- distinct(departure_data)
+```
 
 ```{r}
 write.csv(departure_data, file = "datasets/departure_dataset.csv", row.names = FALSE)
@@ -190,9 +194,4 @@ ggplot(top_20_destinations, aes(x = reorder(destination_country, -percentage), y
   ylab("Percentage") +
   ggtitle("Top 20 Destinations by Percentage") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-```
-
-```{r}
-duplicate_rows <- departure_data[duplicated(departure_data), ]
 ```
