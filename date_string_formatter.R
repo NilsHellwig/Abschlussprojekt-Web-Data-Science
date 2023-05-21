@@ -5,6 +5,14 @@ extract_minutes_from_delay_string <- function(input_string) {
   if (input_string == "on time") {
     return(0)
   }
+  
+  # Check if "early" is present in the input_string
+  if (grepl("early", input_string)) {
+    negate_sign <- -1
+  } else {
+    negate_sign <- 1
+  }
+  
   # extract all digits in the string
   numbers <- as.numeric(regmatches(input_string, gregexpr("\\d+", input_string))[[1]])
   
@@ -22,8 +30,9 @@ extract_minutes_from_delay_string <- function(input_string) {
   }
   
   total_minutes <- (hours * 60) + minutes
-  return(total_minutes)
+  return(total_minutes * negate_sign)
 }
+
 
 convert_date_string <- function(date_string) {
   month_codes <- c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
