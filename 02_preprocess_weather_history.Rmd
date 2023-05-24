@@ -87,7 +87,8 @@ for (html_path in html_documents) {
     matches <- str_extract_all(weather_data_string, "'(icon|temp|templow|baro|wind|wd|hum)':[0-9]+")
 
     for (match in matches[[1]]) {
-      key <- str_extract(match, "icon|temp|templow|baro|wind|wd|hum")
+      key <- str_extract(match, "'icon'|'temp'|'templow'|'baro'|'wind'|'wd'|'hum'")
+      key <- str_replace_all(key, "'", "")
       value <- str_extract(match, "(:[0-9]+)")
       value <- str_replace(value, "\\:", "")
       weather_row[[key]] <- value
@@ -140,6 +141,3 @@ head(weather_data)
 ```{r}
 write.csv(weather_data, file = "datasets/weather_munich_dataset.csv", row.names = FALSE)
 ```
-
-
-

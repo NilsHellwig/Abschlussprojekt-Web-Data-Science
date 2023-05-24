@@ -42,6 +42,12 @@ convert_date_string <- function(date_string) {
   month <- match(date_parts[3], month_codes)
   year <- as.numeric(date_parts[4])
   
+  # For the flights in the current year (2023), the year is no longer included with the time information on the website. 
+  # Therefore, the year must be added manually.
+  if (is.na(year)) {
+    year <- 2023
+  }
+  
   formatted_date <- sprintf("%04d-%02d-%02d", year, month, day)
   return(formatted_date)
 }

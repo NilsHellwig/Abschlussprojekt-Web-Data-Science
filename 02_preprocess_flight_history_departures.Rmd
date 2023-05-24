@@ -174,7 +174,7 @@ departure_data <- distinct(departure_data)
 ```
 
 ```{r}
-write.csv(departure_data, file = "datasets/departure_dataset.csv", row.names = FALSE)
+#write.csv(departure_data, file = "datasets/departure_dataset.csv", row.names = FALSE)
 ```
 
 ```{r}

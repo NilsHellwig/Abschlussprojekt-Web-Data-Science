@@ -1,0 +1,203 @@
+---
+title: "Dataset Exploration"
+author: "Nils Hellwig"
+date: "24 5 2023"
+output: html_document
+---
+
+In order to gain a better understanding of what the data collected looks like, important characteristics of the dataset will be presented/visualised.
+
+# Load Packages
+
+```{r}
+library(ggplot2)
+library(dplyr)
+```
+
+
+# Load Datasets
+
+First, we need to load the dataset
+
+```{r}
+departure_data <- read.csv("datasets/departure_dataset.csv")
+departure_data$date_departure <- gsub("00NA", "2023", departure_data$date_departure)
+departure_data$date_departure <- as.Date(departure_data$date_departure)
+
+# Let's add a column with the month
+departure_data <- departure_data %>%
+  mutate(month_year = format(date_departure, "%Y-%m"))
+
+departure_data$date_departure_month <- format(departure_data$date_departure, "%m")
+departure_data$date_departure_year <- format(departure_data$date_departure, "%Y")
+departure_data$departure_scheduled_time_local_hour <- format(as.POSIXct(departure_data$departure_scheduled_time_local, format = "%H:%M"), format = "%H")
+```
+
+Let's have a look to our data...
+
+```{r}
+departure_data
+```
+
+# Explore Departure Data in General
+
+In a first step, we can explore our dataset and its characteristics. 
+It is always important to note that our dataset is only a sample. For each day between 18.09.2017 and 15.05.2023 flights that took off/landed in Munich were collected by flightera.org, whereby the flights were only collected for two random hours of each day (see 01_... notebooks).
+Now, we can have a look at how many flights have landed, were diverted etc. (occurrences of the various flight statuses)
+
+```{r}
+table(departure_data$flight_status)
+```
+
+Due to the Covid-19 pandemic, strong differences between the years can be observed here.
+
+```{r, fig.width = 10, fig.height = 20}
+flight_status_count <- departure_data %>%
+  group_by(date_departure_year, date_departure_month, flight_status) %>%
+  summarise(count = n())
+
+ggplot(flight_status_count, aes(x = date_departure_month, y = count, fill = flight_status)) +
+  geom_bar(stat = "identity", position = "stack") +
+  facet_wrap(~date_departure_year, ncol = 1) +
+  xlab("Month") +
+  ylab("# Flights") +
+  ggtitle("Distribution of Flight Status by Month (Year-wise)")
+
+```
+
+Next, we can look at how many flights were planned to took off from Munich Airport in the period for which the data was collected for.
+
+```{r}
+# Let's only consider the months for which data is available for each day in that month. 
+flight_count_departure <- departure_data[!(format(departure_data$date_departure, "%Y-%m") %in% c("2017-09", "2023-05")), ] %>%
+  group_by(month_year) %>%
+  summarise(count = n())
+
+ggplot(flight_count_departure, aes(x = as.Date(paste(month_year, "01", sep = "-")), y = count)) +
+  geom_line() +
+  scale_x_date(date_labels = "%b %Y", date_breaks = "1 year") +
+  labs(x = "Month", y = "# Flights") +
+  ggtitle("Departures from Munich Airport")
+```
+
+```{r}
+airlines <- as.data.frame(table(departure_data$airline_name))
+colnames(airlines) <- c("airline_name", "count")
+airlines
+```
+
+```{r}
+destinations <- departure_data %>%
+  group_by(destination_IATA, destination_name) %>%
+  summarise(count = n()) %>%
+  arrange(-count)
+
+destinations
+```
+
+```{r}
+top_20_airlines_departure <- departure_data %>%
+  count(airline_name) %>%
+  mutate(percentage = (n / nrow(departure_data)) * 100) %>%
+  arrange(-percentage) %>%
+  head(20)
+
+ggplot(top_20_airlines_departure, aes(x = reorder(airline_name, -percentage), y = percentage)) +
+  geom_bar(stat = "identity", fill = "orange") +
+  xlab("Airline") +
+  ylab("% of all collected Flights") +
+  ggtitle("Top 20 Airlines by Percentage") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+top_20_destinations_departure <- departure_data %>%
+  count(destination_country) %>%
+  mutate(percentage = (n / nrow(departure_data)) * 100) %>%
+  arrange(-percentage) %>%
+  head(20)
+
+ggplot(top_20_destinations_departure, aes(x = reorder(destination_country, -percentage), y = percentage)) +
+  geom_bar(stat = "identity", fill = "blue") +
+  xlab("Destination (Country)") +
+  ylab("% of all collected Flights") +
+  ggtitle("Top 20 Destinations by Percentage") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+```{r}
+departure_data
+```
+Now, let's take a look at how high the average delay is
+
+```{r}
+delay_departure_data <- departure_data[departure_data$flight_status == "Landed" & departure_data$delay_departure_min <= 1440 & departure_data$delay_departure_min >= -200, ]
+
+# Let's only consider the months for which data is available for each day in that month. 
+delay_departure_data <- delay_departure_data[!(format(delay_departure_data$date_departure, "%Y-%m") %in% c("2017-09", "2023-05")), ]
+```
+
+```{r}
+# Let's have a look to how many flights are delayed of those which landed successfully
+delay_departure_data$delay_departure <- ifelse(delay_departure_data$delay_departure_min > 0, "delayed",
+                                         ifelse(delay_departure_data$delay_departure_min < 0, "landed earlier",
+                                                "on time"))
+print(table(delay_departure_data$delay_departure))
+delay_departure_data <- delay_departure_data[delay_departure_data$delay_departure == "delayed",]
+```
+
+```{r}
+summary(delay_departure_data$delay_departure_min)
+```
+
+```{r}
+average_delay_destination_departures <- delay_departure_data %>%
+  group_by(month_year) %>%
+  summarise(avg_delay = mean(delay_departure_min))
+
+ggplot(average_delay_destination_departures, aes(x = as.Date(paste(month_year, "01", sep = "-")), y = avg_delay)) +
+  geom_bar(stat = "identity", fill = "blue") +
+  scale_x_date(date_labels = "%b %Y", date_breaks = "1 year") +
+  labs(x = "Month", y = "Average Delay (Departure) in Minutes") +
+  ggtitle("Departures from Munich Airport")
+```
+
+```{r}
+summary(delay_departure_data[delay_departure_data$month_year == "2020-05",]$delay_departure_min)
+```
+
+```{r}
+ggplot(delay_departure_data, aes(x = date_departure_month, y = delay_departure_min)) +
+  geom_boxplot() +
+  labs(x = "Month", y = "Delay (Minutes)", title = "Distribution of Delay per Month") +
+  coord_cartesian(ylim = c(0, 100))
+```
+
+```{r}
+ggplot(delay_departure_data, aes(x = departure_scheduled_time_local_hour, y = delay_departure_min)) +
+  geom_boxplot() +
+  labs(x = "Hour", y = "Delay (Minutes)", title = "Distribution of Delay at Different Times of the Day") +
+  coord_cartesian(ylim = c(0, 50))
+```
+
+```{r}
+top_airlines_delay <- delay_departure_data %>%
+  group_by(airline_name, airline_country) %>%
+  summarise(delay = mean(delay_departure_min), count = n()) %>%
+  filter(count >= 365) %>%
+  arrange(-delay)
+
+top_airlines_delay
+```
+
+```{r}
+# Verspätung je Monat
+# Delay Ankunft
+# Signifikanztests
+# wie viele Airlines / wie viele Ziele
+# Wie viele Flüge gecancelt / etc in Plot darstellen
+# Problem: Manchmal wird für weitere Studien gecrawlt
+# Schauen ob bei bestimmtem Wetter häufiger mehr Verspätung
+```
+
