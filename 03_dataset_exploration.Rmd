@@ -26,6 +26,7 @@ departure_data$date_departure <- as.Date(departure_data$date_departure)
 departure_data$planned_departure_month_year <- format(departure_data$date_departure, "%Y-%m")
 departure_data$planned_departure_month <- format(departure_data$date_departure, "%m")
 departure_data$planned_departure_year <- format(departure_data$date_departure, "%Y")
+Sys.setlocale("LC_TIME", "C")
 weekday_order <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 departure_data$planned_departure_weekday <- factor(weekdays(departure_data$date_departure), levels = weekday_order)
 departure_data$departure_scheduled_time_local_hour <- format(as.POSIXct(departure_data$departure_scheduled_time_local, format = "%H:%M"), format = "%H")
@@ -34,39 +35,22 @@ departure_data$departure_scheduled_time_local_hour <- format(as.POSIXct(departur
 weather_data <- read.csv("datasets/weather_munich_dataset.csv")
 ```
 
+
 ```{r}
-#departure_data$date_departure <- as.Date(departure_data$date_departure)
+weather_data$datetime <- as.POSIXct(paste(weather_data$date, weather_data$six_hours_starting_from))
 departure_data$departure_scheduled_utc_time <- as.POSIXct(departure_data$departure_scheduled_utc_time, format = "%H:%M")
+departure_data$departure_datetime <- as.POSIXct(paste(departure_data$date_departure, format(departure_data$departure_scheduled_utc_time, "%H:%M")), format = "%Y-%m-%d %H:%M")
+```
 
-weather_data$date <- as.Date(weather_data$date)
-weather_data$six_hours_starting_from <- as.POSIXct(weather_data$six_hours_starting_from, format = "%H:%M")
-
-match_weather_icon <- function(departure_time) {
-  interval_start <- as.POSIXct(format(departure_time, "%Y-%m-%d %H:00"))
-  interval_end <- interval_start + hours(6)
-  print(interval_start)
-  print(interval_end)
-  print(departure_time)
-  
-  matching_row <- weather_data$date == departure_time$date_departure &
-                   weather_data$six_hours_starting_from >= interval_start &
-                   weather_data$six_hours_starting_from < interval_end
-  
-  if (any(matching_row)) {
-    return(weather_data$weather_icon[matching_row])
-  } else {
-    return(NA)
-  }
+```{r}
+get_weather_data <- function(departure_time) {
+  weather_data$diff <- abs(weather_data$datetime - departure_time)
+  nearest_row <- weather_data[which.min(weather_data$diff), ]
+  return(nearest_row$description[1])
 }
 
-departure_data$departure_datetime <- as.POSIXct(paste(departure_data$date_departure, format(departure_data$departure_scheduled_utc_time, "%H:%M")), format = "%Y-%m-%d %H:%M")
-departure_data$weather_icon <- sapply(departure_data$departure_datetime, match_weather_icon)
+departure_data$weather_description <- sapply(departure_data$departure_datetime, get_weather_data)
 ```
-
-```{r}
-weather_data
-```
-
 
 Let's have a look to our data...
 
@@ -239,6 +223,11 @@ ggplot(delay_departure_data, aes(x = departure_scheduled_time_local_hour, y = de
 ```
 
 ```{r}
+delay_departure_data
+```
+
+
+```{r}
 ggplot(delay_departure_data, aes(x = planned_departure_weekday, y = delay_departure_min)) +
   geom_boxplot() +
   labs(x = "Weekday", y = "Delay (Minutes)", title = "Distribution of delay at different weekdays") +
@@ -268,6 +257,23 @@ top_destination_delay <- delay_departure_data %>%
 
 top_destination_delay
 ```
+
+Last, let's have a look at how the weather might have an influence on delays...
+
+```{r}
+top_weather_delay <- delay_departure_data %>%
+  group_by(weather_description) %>%
+  summarise(delay_mean = mean(delay_departure_min), delay_median = median(delay_departure_min), count = n()) %>%
+  #filter(count >= 365) %>%
+  arrange(-delay_mean)
+
+top_weather_delay
+```
+
+```{r}
+delay_departure_data
+```
+
 
 Featured explored:
 
