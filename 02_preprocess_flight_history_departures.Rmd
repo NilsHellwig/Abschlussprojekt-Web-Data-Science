@@ -13,6 +13,7 @@ library(tidyverse)
 library(stringr)
 library(xml2)
 source("date_string_formatter.R")
+library(lubridate)
 ```
 
 ## Define Settings
@@ -26,12 +27,15 @@ folder_path_departures <- "datasets/raw_departures_dataset"
 ```{r}
 # Load the filepaths of all the .html-documents
 html_documents <- list.files(path = folder_path_departures, pattern = "\\.html$", full.names = TRUE)
+html_documents <- tail(html_documents, 5)
 head(html_documents)
 ```
 
 ```{r}
 departure_data <- data.frame(
-  date_departure = character(),
+  departure_scheduled_datetime_local = character(),
+  departure_scheduled_time_local_timezone = character(),
+  departure_scheduled_datetime_utc = character(),
   flight_status = character(),
   airline_name = character(),
   flight_number = character(),
@@ -43,10 +47,6 @@ departure_data <- data.frame(
   destination_name = character(),
   destination_IATA = character(),
   destination_ICAO = character(),
-  departure_scheduled_time_local = character(),
-  departure_scheduled_time_local_timezone = character(),
-  departure_scheduled_utc_time = character(),
-  departure_scheduled_utc_time_timezone = character(),
   departure_actual_time = character(),
   departure_actual_time_timezone = character(),
   delay_departure_min = numeric(),
@@ -102,22 +102,22 @@ for (i in seq_along(html_documents)) {
       airline_code_IATA <- airline[2]
       airline_name <- sub("\\s\\S+$", "", airline)[1]
       
-      date_departure <- convert_date_string(strsplit(child_elements_txt[1], "\n")[[1]][1])
+      departure_scheduled_date_local <- convert_date_string(strsplit(child_elements_txt[1], "\n")[[1]][1])
       flight_status <- tail(gsub("\\s+", "",strsplit(child_elements_txt[1], "\n")[[1]]), n = 1)
       
-      if (year(as.Date(date_departure))==2023) {
+      # Although we know that the local timezone of munich is CEST, I decided to extract that data too because 
+      # one might want to use the script for another airport
+      if (year(as.Date(departure_scheduled_date_local))==2023) {
         departure_scheduled_time_local <- strsplit(child_elements_txt[1], "\n")[[1]][7]
         departure_scheduled_time_local_timezone <- strsplit(child_elements_txt[1], "\n")[[1]][8]
       } else {
         departure_scheduled_time_local <- strsplit(child_elements_txt[1], "\n")[[1]][8]
         departure_scheduled_time_local_timezone <- strsplit(child_elements_txt[1], "\n")[[1]][9]
       }
-      
-      # Extract the time after "\n\n    "
-      departure_scheduled_utc <- strsplit(child_elements_txt[4], "\n\n    ")[[1]][2]
-      departure_scheduled_utc_time <- strsplit(departure_scheduled_utc, " ")[[1]][1]
-      departure_scheduled_utc_time_timezone <- strsplit(departure_scheduled_utc, " ")[[1]][2]
-      
+
+      departure_scheduled_datetime_local <- paste(departure_scheduled_date_local, departure_scheduled_time_local)
+      departure_scheduled_datetime_utc <- format(with_tz(ymd_hm(departure_scheduled_datetime_local, tz = "CEST"), "UTC"), "%Y-%m-%d %H:%M")
+     
       destination_name <- sub(" \\(.*", "", child_elements_txt[3])
       # str_match returns the second column of these matrices
       flight_code_IATA <- str_match(child_elements_txt[3], "\\(([A-Z]{3}) /")[, 2]
@@ -145,7 +145,9 @@ for (i in seq_along(html_documents)) {
       # Finally, we can add all the extracted information regarding a specific flight to our dataframe
       departure_data <- departure_data %>%
         add_row(
-          date_departure = date_departure,
+          departure_scheduled_datetime_local = departure_scheduled_datetime_local,
+          departure_scheduled_time_local_timezone = departure_scheduled_time_local_timezone,
+          departure_scheduled_datetime_utc = departure_scheduled_datetime_utc,
           airline_code = airline_code,
           airline_code_IATA = airline_code_IATA,
           airline_name = airline_name,
@@ -153,10 +155,6 @@ for (i in seq_along(html_documents)) {
           flight_number = flight_number[[1]][1],
           flight_number_IATA = flight_number_IATA,
           flight_status = flight_status,
-          departure_scheduled_time_local = departure_scheduled_time_local,
-          departure_scheduled_time_local_timezone = departure_scheduled_time_local_timezone,
-          departure_scheduled_utc_time = departure_scheduled_utc_time,
-          departure_scheduled_utc_time_timezone = departure_scheduled_utc_time_timezone,
           departure_actual_time = departure_actual_time,
           departure_actual_time_timezone = departure_actual_time_timezone,
           destination_name = destination_name,
@@ -179,5 +177,10 @@ departure_data <- distinct(departure_data)
 ```
 
 ```{r}
-write.csv(departure_data, file = "datasets/departure_dataset.csv", row.names = FALSE)
+departure_data
+```
+
+
+```{r}
+#write.csv(departure_data, file = "datasets/departure_dataset.csv", row.names = FALSE)
 ```
