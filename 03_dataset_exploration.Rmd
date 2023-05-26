@@ -23,30 +23,44 @@ First, we need to load the dataset
 # Load departure data
 departure_data <- read.csv("datasets/departure_dataset.csv")
 departure_data$date_departure <- as.Date(departure_data$date_departure)
+
+# For easy processing, I create separate columns for the month, year and hour of the planned departure.
 departure_data$planned_departure_month_year <- format(departure_data$date_departure, "%Y-%m")
 departure_data$planned_departure_month <- format(departure_data$date_departure, "%m")
 departure_data$planned_departure_year <- format(departure_data$date_departure, "%Y")
+departure_data$departure_scheduled_time_local_hour <- format(as.POSIXct(departure_data$departure_scheduled_time_local, format = "%H:%M"), format = "%H")
+
+# Setting the language with Sys.setenv is relevant to show the delays correctly depending on the week (names should be in English in the plot)
 Sys.setlocale("LC_TIME", "C")
 weekday_order <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 departure_data$planned_departure_weekday <- factor(weekdays(departure_data$date_departure), levels = weekday_order)
-departure_data$departure_scheduled_time_local_hour <- format(as.POSIXct(departure_data$departure_scheduled_time_local, format = "%H:%M"), format = "%H")
 
 # Load weather data
 weather_data <- read.csv("datasets/weather_munich_dataset.csv")
 ```
 
-
 ```{r}
 weather_data$datetime <- as.POSIXct(paste(weather_data$date, weather_data$six_hours_starting_from))
-departure_data$departure_scheduled_utc_time <- as.POSIXct(departure_data$departure_scheduled_utc_time, format = "%H:%M")
-departure_data$departure_datetime <- as.POSIXct(paste(departure_data$date_departure, format(departure_data$departure_scheduled_utc_time, "%H:%M")), format = "%Y-%m-%d %H:%M")
+departure_data$departure_scheduled_time_local <- as.POSIXct(departure_data$departure_scheduled_time_local, format = "%H:%M")
+departure_data$departure_datetime <- as.POSIXct(paste(departure_data$date_departure, format(departure_data$departure_scheduled_time_local, "%H:%M")), format = "%Y-%m-%d %H:%M")
 ```
+
+
 
 ```{r}
 get_weather_data <- function(departure_time) {
-  weather_data$diff <- abs(weather_data$datetime - departure_time)
-  nearest_row <- weather_data[which.min(weather_data$diff), ]
-  return(nearest_row$description[1])
+  if (format(departure_time, format = "%Y-%m-%d 06:00:00 CEST") > departure_time) {
+    weather_span <- format(departure_time, format = "%Y-%m-%d 00:00:00 CEST")
+  } else if (format(departure_time, format = "%Y-%m-%d 12:00:00") > departure_time) {
+    weather_span <- format(departure_time, format = "%Y-%m-%d 06:00:00 CEST")
+  } else if (format(departure_time, format = "%Y-%m-%d 18:00:00") > departure_time) {
+    weather_span <- format(departure_time, format = "%Y-%m-%d 12:00:00 CEST")
+  } else if (format(departure_time, format = "%Y-%m-%d 24:00:00") > departure_time) {
+    weather_span <- format(departure_time, format = "%Y-%m-%d 18:00:00 CEST")
+  } 
+  
+  nearest_row <- weather_data[weather_data$datetime == weather_span,]$description[1]
+  return(nearest_row)
 }
 
 departure_data$weather_description <- sapply(departure_data$departure_datetime, get_weather_data)
@@ -275,14 +289,6 @@ delay_departure_data
 ```
 
 
-Featured explored:
-
-* Destination
-* Airline
-* Hour of the day
-* Month
-* Weekday?
-* Weather
 
 ```{r}
 # Verspätung je Monat

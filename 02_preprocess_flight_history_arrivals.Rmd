@@ -105,9 +105,13 @@ for (i in seq_along(html_documents)) {
       date_departure <- convert_date_string(strsplit(child_elements_txt[1], "\n")[[1]][1])
       flight_status <- tail(gsub("\\s+", "",strsplit(child_elements_txt[1], "\n")[[1]]), n = 1)
       
-      #print(strsplit(child_elements_txt[1], "\n")[[1]][7])
-      arrival_scheduled_time_local <- strsplit(child_elements_txt[1], "\n")[[1]][7]
-      arrival_scheduled_time_local_timezone <- strsplit(child_elements_txt[1], "\n")[[1]][8]
+      if (year(as.Date(date_departure))==2023) {
+        arrival_scheduled_time_local <- strsplit(child_elements_txt[1], "\n")[[1]][6]
+        arrival_scheduled_time_local_timezone <- strsplit(child_elements_txt[1], "\n")[[1]][7]
+      } else {
+        arrival_scheduled_time_local <- strsplit(child_elements_txt[1], "\n")[[1]][7]
+        arrival_scheduled_time_local_timezone <- strsplit(child_elements_txt[1], "\n")[[1]][8]
+      }
 
       # Extract the time after "\n\n    "
       arrival_scheduled_utc <- strsplit(child_elements_txt[4], "\n\n    ")[[1]][2]
@@ -176,24 +180,4 @@ arrival_data <- distinct(arrival_data)
 
 ```{r}
 write.csv(arrival_data, file = "datasets/arrival_dataset.csv", row.names = FALSE)
-```
-
-```{r}
-library(ggplot2)
-
-total_flights <- nrow(arrival_data)
-
-top_20_departure_points <- arrival_data %>%
-  count(departure_point_country) %>%
-  mutate(percentage = (n / total_flights) * 100) %>%
-  arrange(-percentage) %>%
-  head(20)
-
-ggplot(top_20_departure_points, aes(x = reorder(departure_point_country, -percentage), y = percentage)) +
-  geom_bar(stat = "identity", fill = "blue") +
-  xlab("Departure Point") +
-  ylab("Percentage") +
-  ggtitle("Top 20 Departure Points by Percentage") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
 ```
