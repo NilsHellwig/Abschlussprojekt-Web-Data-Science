@@ -27,7 +27,6 @@ folder_path_departures <- "datasets/raw_departures_dataset"
 ```{r}
 # Load the filepaths of all the .html-documents
 html_documents <- list.files(path = folder_path_departures, pattern = "\\.html$", full.names = TRUE)
-html_documents <- tail(html_documents, 5)
 head(html_documents)
 ```
 
@@ -47,12 +46,10 @@ departure_data <- data.frame(
   destination_name = character(),
   destination_IATA = character(),
   destination_ICAO = character(),
-  departure_actual_time = character(),
-  departure_actual_time_timezone = character(),
+  departure_actual_datetime_local = character(),
   delay_departure_min = numeric(),
   delay_arrival_min = numeric(),
-  actual_arrival_time = character(),
-  actual_arrival_time_timezone = character(),
+  actual_arrival_datetime_local = character(),
   flight_duration_time_min = numeric()
 )
 ```
@@ -67,6 +64,7 @@ for (i in seq_along(html_documents)) {
     html_nodes("tbody tr.bg-gray-50, tbody tr.bg-white")
   
   for (flight_element in extracted_data) {
+    
       # let's start by storing all child elements of a flight's flight_element 
       child_elements_txt <- flight_element %>%
         html_children() %>%
@@ -75,10 +73,6 @@ for (i in seq_along(html_documents)) {
       
       flag_imgs <- flight_element %>%
          html_nodes("img[alt*='Flag for']")
-      
-      if (length(flag_imgs) == 3) {
-        print(flag_imgs)
-      }
 
       # It happens that the airline can not be assigned to a country so that there's no flag icon.
       # Example: Flight to Liege (Belgium), see here: https://www.flightera.net/en/airport/Munich/EDDM/departure/2017-12-13%2022_00?
@@ -119,24 +113,22 @@ for (i in seq_along(html_documents)) {
       departure_scheduled_datetime_utc <- format(with_tz(ymd_hm(departure_scheduled_datetime_local, tz = "CEST"), "UTC"), "%Y-%m-%d %H:%M")
      
       destination_name <- sub(" \\(.*", "", child_elements_txt[3])
+      
       # str_match returns the second column of these matrices
       flight_code_IATA <- str_match(child_elements_txt[3], "\\(([A-Z]{3}) /")[, 2]
       flight_code_ICAO <- str_match(child_elements_txt[3], " / ([A-Z]{4})\\)")[, 2]
       
-      if (flight_status != "Cancelled" & flight_status != "Diverted" & flight_status != "Unknown") {
-        departure_actual_time <- sub("\\n.*", "", child_elements_txt[5])
-        departure_actual_time_timezone <- strsplit(child_elements_txt[5], "\n")[[1]][2]
-      
+      if (flight_status == "Landed") {
         delay_departure_split <- strsplit(child_elements_txt[5], "\n")[[1]]
         delay_departure_min <- extract_minutes_from_delay_string(delay_departure_split)
+        
+        departure_actual_datetime_local <- format(ymd_hm(departure_scheduled_datetime_local) + minutes(delay_departure_min), "%Y-%m-%d %H:%M")
       
         delay_arrival_split <- strsplit(child_elements_txt[6], "\n")[[1]]
         delay_arrival_min <- extract_minutes_from_delay_string(delay_arrival_split)
-      
-        actual_arrival_time <- sub("\\n.*", "", child_elements_txt[6])
-        actual_arrival_time_timezone <- strsplit(child_elements_txt[6], "\n")[[1]][2]
-      
+        
         flight_duration_time_min <- extract_minutes_from_delay_string(child_elements_txt[7])
+        actual_arrival_datetime_local <- format(ymd_hm(departure_scheduled_datetime_local) + minutes(flight_duration_time_min + delay_departure_min), "%Y-%m-%d %H:%M")
       }
       
       flight_number_IATA <- flight_number[[1]][2]
@@ -155,21 +147,21 @@ for (i in seq_along(html_documents)) {
           flight_number = flight_number[[1]][1],
           flight_number_IATA = flight_number_IATA,
           flight_status = flight_status,
-          departure_actual_time = departure_actual_time,
-          departure_actual_time_timezone = departure_actual_time_timezone,
+          departure_actual_datetime_local = departure_actual_datetime_local,
           destination_name = destination_name,
           destination_IATA = flight_code_IATA,
           destination_ICAO = flight_code_ICAO,
           destination_country = destination_country,
           delay_departure_min = delay_departure_min,
           delay_arrival_min = delay_arrival_min,
-          actual_arrival_time = actual_arrival_time,
-          actual_arrival_time_timezone = actual_arrival_time_timezone,
+          actual_arrival_datetime_local = actual_arrival_datetime_local,
           flight_duration_time_min = flight_duration_time_min
         )
   }
 }
 ```
+
+If there are not at least 30 flights available for an hour on flightera.com, more than one randomly selected hour may be crawled, in rare cases duplicates may occur. This is because if there are less than 30 flights available, the flights for the hours after the randomly selected hour are returned - to get 30 flights in each case.
 
 ```{r}
 duplicate_rows <- departure_data[duplicated(departure_data), ]
@@ -177,10 +169,25 @@ departure_data <- distinct(departure_data)
 ```
 
 ```{r}
+# For better data handling, I´ll create separate columns for month, year and hour of the planned departures.
+departure_data$departure_scheduled_datetime_local <- as.POSIXct(departure_data$departure_scheduled_datetime_local, format = "%Y-%m-%d %H:%M")
+departure_data$departure_scheduled_month_year_local <- format(departure_data$departure_scheduled_datetime_local, "%Y-%m")
+departure_data$departure_scheduled_month_local <- format(departure_data$departure_scheduled_datetime_local, "%m")
+departure_data$departure_scheduled_year_local <- format(departure_data$departure_scheduled_datetime_local, "%Y")
+departure_data$departure_scheduled_time_local_hour_local <- format(departure_data$departure_scheduled_datetime_local, format = "%H")
+
+# Setting the language with Sys.setenv is relevant to show the delays correctly depending on the week (names should be in English in the plot)
+Sys.setlocale("LC_TIME", "C")
+weekday_order <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+departure_data$departure_scheduled_weekday_local <- factor(weekdays(departure_data$departure_scheduled_datetime_local), levels = weekday_order)
+```
+
+
+```{r}
 departure_data
 ```
 
 
 ```{r}
-#write.csv(departure_data, file = "datasets/departure_dataset.csv", row.names = FALSE)
+write.csv(departure_data, file = "datasets/departure_dataset.csv", row.names = FALSE)
 ```
