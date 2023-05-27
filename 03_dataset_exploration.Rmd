@@ -145,7 +145,7 @@ ggplot(top_20_destinations_departure, aes(x = reorder(destination_country, -perc
 ```
 
 # ------ Feature Exploration --------
-# Analyse Delay of departure from Munich airport
+# Analyse delay of departure from Munich airport
 
 
 Next, we can examine how often and how much delayed flights are taking off from Munich. To analyse delays, we only look at flights that have landed and not flights that have been cancelled, diverted or whose status is unknown etc.. We also need to remove outliers. There seem to be flights with extreme delays, which probably does not correspond to reality but is an error.
@@ -202,7 +202,7 @@ This trend can also be seen if one excludes the two years 2020 and 2021, which w
 ```{r}
 years_no_pandemic <- c(2017, 2018, 2019, 2020, 2023)
 
-ggplot(delay_departure_data %>% filter(departure_scheduled_year_local %in% years_no_pandemic), aes(x = departure_scheduled_month_local, y = delay_departure_min)) +
+ggplot(delay_departure_data %>% filter(departure_scheduled_year_local %in% years_no_pandemic), aes(x = as.factor(departure_scheduled_month_local), y = delay_departure_min)) +
   geom_boxplot() +
   labs(x = "Month", y = "Delay (Minutes)", title = "Distribution of Delay per Month [without 2020 and 2021]") +
   coord_cartesian(ylim = c(0, 100))
@@ -211,7 +211,12 @@ ggplot(delay_departure_data %>% filter(departure_scheduled_year_local %in% years
 Furthermore, there also seems to be differences depending on the time of day (hour of the day) as to how severe the delay of the departure of flights is. 
 
 ```{r}
-ggplot(delay_departure_data, aes(x = departure_scheduled_time_local_hour_local, y = delay_departure_min)) +
+delay_departure_data
+```
+
+
+```{r}
+ggplot(delay_departure_data, aes(x = as.factor(departure_scheduled_hour_local), y = delay_departure_min)) +
   geom_boxplot() +
   labs(x = "Hour", y = "Delay (Minutes)", title = "Distribution of delay at different times of the day") +
   coord_cartesian(ylim = c(0, 50))

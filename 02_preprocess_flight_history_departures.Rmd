@@ -55,7 +55,7 @@ departure_data <- data.frame(
 ```
 
 ```{r}
-# Load each .html-document and
+# Load each .html-document
 for (i in seq_along(html_documents)) {
   doc_path <- html_documents[i]
   doc <- read_html(doc_path)
@@ -64,7 +64,6 @@ for (i in seq_along(html_documents)) {
     html_nodes("tbody tr.bg-gray-50, tbody tr.bg-white")
   
   for (flight_element in extracted_data) {
-    
       # let's start by storing all child elements of a flight's flight_element 
       child_elements_txt <- flight_element %>%
         html_children() %>%
@@ -96,9 +95,11 @@ for (i in seq_along(html_documents)) {
       airline_code_IATA <- airline[2]
       airline_name <- sub("\\s\\S+$", "", airline)[1]
       
+      
       departure_scheduled_date_local <- convert_date_string(strsplit(child_elements_txt[1], "\n")[[1]][1])
       flight_status <- tail(gsub("\\s+", "",strsplit(child_elements_txt[1], "\n")[[1]]), n = 1)
-      
+ 
+           
       # Although we know that the local timezone of munich is CEST, I decided to extract that data too because 
       # one might want to use the script for another airport
       if (year(as.Date(departure_scheduled_date_local))==2023) {
@@ -121,15 +122,14 @@ for (i in seq_along(html_documents)) {
       if (flight_status == "Landed") {
         delay_departure_split <- strsplit(child_elements_txt[5], "\n")[[1]]
         delay_departure_min <- extract_minutes_from_delay_string(delay_departure_split)
-        
         departure_actual_datetime_local <- format(ymd_hm(departure_scheduled_datetime_local) + minutes(delay_departure_min), "%Y-%m-%d %H:%M")
-      
         delay_arrival_split <- strsplit(child_elements_txt[6], "\n")[[1]]
         delay_arrival_min <- extract_minutes_from_delay_string(delay_arrival_split)
         
         flight_duration_time_min <- extract_minutes_from_delay_string(child_elements_txt[7])
         actual_arrival_datetime_local <- format(ymd_hm(departure_scheduled_datetime_local) + minutes(flight_duration_time_min + delay_departure_min), "%Y-%m-%d %H:%M")
       }
+      
       
       flight_number_IATA <- flight_number[[1]][2]
       flight_number <- flight_number[[1]][1]
@@ -174,7 +174,7 @@ departure_data$departure_scheduled_datetime_local <- as.POSIXct(departure_data$d
 departure_data$departure_scheduled_month_year_local <- format(departure_data$departure_scheduled_datetime_local, "%Y-%m")
 departure_data$departure_scheduled_month_local <- format(departure_data$departure_scheduled_datetime_local, "%m")
 departure_data$departure_scheduled_year_local <- format(departure_data$departure_scheduled_datetime_local, "%Y")
-departure_data$departure_scheduled_time_local_hour_local <- format(departure_data$departure_scheduled_datetime_local, format = "%H")
+departure_data$departure_scheduled_hour_local <- format(departure_data$departure_scheduled_datetime_local, format = "%H")
 
 # Setting the language with Sys.setenv is relevant to show the delays correctly depending on the week (names should be in English in the plot)
 Sys.setlocale("LC_TIME", "C")
