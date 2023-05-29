@@ -104,16 +104,21 @@ for (html_path in html_documents) {
 }
 ```
 
-## Show data
-
-```{r}
-weather_data
-```
 ## Further preprocessing
 
 ```{r}
+convert_datetime <- function(string) {
+  date_time <- strptime(string, "%A, %d. %B %Y, %H:%M")
+  return(format(date_time, "%Y-%m-%d %H:%M:%S"))
+}
+
+weather_data$ds <- sapply(weather_data$ds, convert_datetime)
+weather_data
+```
+
+```{r}
 # store  date and time in a separate column
-weather_data$ds <- as.POSIXlt(weather_data$ds, format = "%A, %d. %B %Y, %H:%M —")
+weather_data$ds <- as.POSIXct(weather_data$ds)
 weather_data$date <- format(weather_data$ds, "%Y-%m-%d")
 weather_data$six_hours_starting_from <- format(weather_data$ds, "%H:%M")
 weather_data <- subset(weather_data, select = -ds)
