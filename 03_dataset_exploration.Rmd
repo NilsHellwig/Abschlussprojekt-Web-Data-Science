@@ -21,7 +21,7 @@ First, we need to load the dataset and add some columns that will be used for ex
 
 ```{r}
 # Load departure data
-departure_data <- read.csv("datasets/departure_dataset.csv")
+departure_data <- read.csv("datasets/departure_dataset.csv")[1:10,]
 weather_data <- read.csv("datasets/weather_munich_dataset.csv")
 ```
 
@@ -41,8 +41,9 @@ get_weather_data <- function(departure_time) {
   } else if (format(departure_time, format = "%Y-%m-%d 24:00:00") > departure_time) {
     weather_span <- format(departure_time, format = "%Y-%m-%d 18:00:00 CEST")
   } 
-  nearest_row <- weather_data[weather_data$six_hours_starting_from_datatime == weather_span,]$description[1]
-  return(nearest_row)
+  nearest_row <- weather_data[weather_data$six_hours_starting_from_datatime == weather_span,]
+  print(nearest_row)
+  return(nearest_row$description[1])
 }
 departure_data$weather_description <- sapply(departure_data$departure_scheduled_datetime_local, get_weather_data)
 ```
@@ -191,7 +192,7 @@ ggplot(average_delay_destination_departures, aes(x = as.Date(paste(departure_sch
 There also seems to be a difference in how much the average delay is depending on the month.
 
 ```{r}
-ggplot(delay_departure_data, aes(x = departure_scheduled_month_local, y = delay_departure_min)) +
+ggplot(delay_departure_data, aes(x = as.factor(departure_scheduled_month_local), y = delay_departure_min)) +
   geom_boxplot() +
   labs(x = "Month", y = "Delay (Minutes)", title = "Distribution of Delay per Month") +
   coord_cartesian(ylim = c(0, 100))
@@ -225,7 +226,6 @@ ggplot(delay_departure_data, aes(x = as.factor(departure_scheduled_hour_local), 
 ```{r}
 delay_departure_data
 ```
-
 
 ```{r}
 ggplot(delay_departure_data, aes(x = departure_scheduled_weekday_local, y = delay_departure_min)) +
