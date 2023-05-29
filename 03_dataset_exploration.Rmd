@@ -123,7 +123,7 @@ top_20_airlines_departure <- departure_data %>%
   head(20)
 
 ggplot(top_20_airlines_departure, aes(x = reorder(airline_name, -percentage), y = percentage)) +
-  geom_bar(stat = "identity", fill = "orange") +
+  geom_bar(stat = "identity", fill = "steelblue") +
   labs(x = "Airline", y = "% of all collected Flights", title = "Most frequent airlines departing from Munich Airport") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
@@ -146,8 +146,8 @@ top_20_destinations_departure <- departure_data %>%
   head(20)
 
 ggplot(top_20_destinations_departure, aes(x = reorder(destination_country, -percentage), y = percentage)) +
-  geom_bar(stat = "identity", fill = "blue") +
-  labs(x = "Destination (Country)", y = "% of all collected Flights", title = "Most frequent destinations from Munich Airport") +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(x = "Destination (Country)", y = "% All Collected Flights", title = "Most frequent destinations from Munich Airport") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
@@ -189,9 +189,9 @@ average_delay_destination_departures <- delay_departure_data %>%
   summarise(avg_delay = mean(delay_departure_min))
 
 ggplot(average_delay_destination_departures, aes(x = as.Date(paste(departure_scheduled_month_year_local, "01", sep = "-")), y = avg_delay)) +
-  geom_bar(stat = "identity", fill = "blue") +
+  geom_bar(stat = "identity", fill = "steelblue") +
   scale_x_date(date_labels = "%b %Y", date_breaks = "1 year") +
-  labs(x = "Month", y = "Average Delay (Departure) in Minutes") +
+  labs(x = "Month", y = "Average Departure Delay (Minutes)") +
   ggtitle("Departures from Munich Airport")
 ```
 
@@ -278,14 +278,28 @@ top_weather_delay
 We can also look at how temperature affects delays
 
 ```{r}
-ggplot(delay_departure_data, aes(x = as.factor(temperature_celsius), y = delay_departure_min)) +
-  geom_point() +
-  labs(x = "Temperature (Celsius)", y = "Departure Delay (Minutes)") +
-  ggtitle("Influence of temperature on delays")
+average_delay_temperature <- delay_departure_data %>%
+  group_by(temperature_celsius) %>%
+  summarize(average_delay = mean(delay_departure_min))
+
+ggplot(average_delay_temperature, aes(x = temperature_celsius, y = average_delay)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(x = "Temperature (Celsius)", y = "Average Departure Delay (Minutes)") +
+  ggtitle("Influence of Temperature on Departure Delay") +
+  coord_cartesian(ylim = c(0, 100))
 ```
 
 ```{r}
-filter(departure_data, temperature_celsius < 0)
+average_delay_wind <- delay_departure_data %>%
+  group_by(wind_speed_km) %>%
+  summarize(average_delay = mean(delay_departure_min))
+
+ggplot(average_delay_wind, aes(x = wind_speed_km, y = average_delay)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(x = "Wind Speed (km/h)", y = "Average Departure Delay (Minutes)") +
+  ggtitle("Influence of Temperature on Departure Delay") +
+  coord_cartesian(ylim = c(0, 100))
+
 ```
 
 

@@ -72,33 +72,32 @@ for (html_path in html_documents) {
       hum = NA
     )
     
-    matches <- str_extract_all(weather_data_string, "'(ds|desc)':('([^']+)')")
+    matches <- str_extract_all(weather_data_string, "'(ds|desc)':('([^']*)')")
 
     for (match in matches[[1]]) {
       key <- str_extract(match, "ds|desc")
-      value <- str_extract(match, "(:'([^']+)')")
+      value <- str_extract(match, "(:'([^']*)')")
       # this expression is used to remove the "'" at the beginning of a string stored in the JavaScript object as well as the colon before the value
       value <- str_replace(value, ":'", "")
       # this expression is used to remove the "'"-sign at the end of a string stored in the JavaScript object
       value <- str_replace(value, "'$", "")
       weather_row[[key]] <- value
     }
-  
-    matches <- str_extract_all(weather_data_string, "'(icon|temp|templow|baro|wind|wd|hum)':[0-9]+")
-
-    for (match in matches[[1]]) {
-      key <- str_extract(match, "'icon'|'temp'|'templow'|'baro'|'wind'|'wd'|'hum'")
-      key <- str_replace_all(key, "'", "")
-      value <- str_extract(match, "(:[0-9]+)")
-      value <- str_replace(value, "\\:", "")
-      weather_row[[key]] <- value
-    }
-    
     # somethimes, there are objects listed without actual weather data for a specific point in time. 
     # for example: "{'offset':0,'scale':1}", which is useless for my purpose.
     # in order to obtain only relevant data, it is checked whether there is the column "ds" or not
-    if (any(!is.na(weather_row$ds))) {
-      weather_data <- rbind(weather_data, weather_row)
+    if (any(!is.na(weather_row$ds)) && weather_row["desc"] != "") {
+       matches <- str_extract_all(weather_data_string, "'(icon|temp|templow|baro|wind|wd|hum)':-?[0-9]+")
+       if (weather_row$desc != "No weather data available") {
+            for (match in matches[[1]]) {
+               key <- str_extract(match, "'icon'|'temp'|'templow'|'baro'|'wind'|'wd'|'hum'")
+               key <- str_replace_all(key, "'", "")
+               value <- str_extract(match, "(:-?[0-9]+)")
+               value <- str_replace(value, "\\:", "")
+               weather_row[[key]] <- value
+            } 
+       }
+       weather_data <- rbind(weather_data, weather_row)
     }
   }
 }
@@ -129,6 +128,7 @@ weather_data <- subset(weather_data, select = -ds)
 weather_data <- weather_data %>%
   arrange(date, six_hours_starting_from)
 ```
+
 ```{r}
 names(weather_data)[names(weather_data) == 'desc'] <- 'description'
 names(weather_data)[names(weather_data) == 'temp'] <- 'temperature_celsius'
@@ -137,10 +137,6 @@ names(weather_data)[names(weather_data) == 'wind'] <- 'wind_speed_km'
 names(weather_data)[names(weather_data) == 'hum'] <- 'humidity'
 # Id of the weather icon. Example: an entry in weather_data with id=19 can be found here: https://c.tadst.com/gfx/w/svg/wt-19.svg (rain)
 names(weather_data)[names(weather_data) == 'icon'] <- 'weather_icon'
-```
-
-```{r}
-head(weather_data)
 ```
 
 ```{r}
