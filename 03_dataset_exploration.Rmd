@@ -87,10 +87,10 @@ ggplot(flight_status_count, aes(x = departure_scheduled_month_local, y = count, 
 ```
 
 Next, we can look at how many flights were *planned* to took off from Munich Airport in the period for which the data was collected for.
-Here it can be seen that in 2020, the year that was strongly influenced by the pandemic, there was a decrease in flights.
+Here it can be seen that in 2020, the year that was strongly influenced by the pandemic, there was a decrease in flights. This is not the case for September 2017 and May 2023, as not all data for these months was available at the time of data collection.
 
 ```{r}
-# Let's only consider the months for which data is available for each day in that month. 
+# Let's only consider months for which data is available for each day. 
 flight_count_departure <- departure_data[!(format(departure_data$departure_scheduled_datetime_local, "%Y-%m") %in% c("2017-09", "2023-05")), ] %>%
   group_by(departure_scheduled_month_year_local) %>%
   summarise(count = n())
@@ -154,14 +154,30 @@ ggplot(top_20_destinations_departure, aes(x = reorder(destination_country, -perc
 # ------ Feature Exploration --------
 # Analyse delay of departure from Munich airport
 
+In order to train a model that predicts flight delays, a subset will be used to evaluate the model. I decided to use the data in the period between the last data point collected and one year before. I do not consider the test data to analyse possible predictors.
+
+```{r}
+scheduled_departure_dates <- as.Date(departure_data$departure_scheduled_datetime_local)
+delay_departure_data <- subset(departure_data, scheduled_departure_dates < max(scheduled_departure_dates) - 365)
+```
+
+```{r}
+delay_departure_data
+```
+
 
 Next, we can examine how often and how much delayed flights are taking off from Munich. To analyse delays, we only look at flights that have landed and not flights that have been cancelled, diverted or whose status is unknown etc.. We also need to remove outliers. There seem to be flights with extreme delays, which probably does not correspond to reality but is an error.
 
 ```{r}
-delay_departure_data <- departure_data[departure_data$flight_status == "Landed" & departure_data$delay_departure_min <= 1440 & departure_data$delay_departure_min >= -200, ]
+z_scores <- scale(delay_departure_data$delay_departure_min)
+z_threshold <- 3
+outliers <- abs(z_scores) > z_threshold
+delay_departure_data <- delay_departure_data[!outliers, ]
+delay_departure_data <- delay_departure_data[delay_departure_data$flight_status == "Landed", ]
+```
 
-# Let's only consider the months for which data is available for each day. 
-delay_departure_data <- delay_departure_data[!(format(delay_departure_data$departure_scheduled_datetime_local, "%Y-%m") %in% c("2017-09", "2023-05")), ]
+```{r}
+quantile(delay_departure_data$delay_departure_min, probs = c(0.0, 0.2, 0.4, 0.6, 0.8, 1.0))
 ```
 
 Next, we can look at how often flights have taken off late, early or on time.
@@ -172,7 +188,6 @@ delay_departure_data$delay_departure <- ifelse(delay_departure_data$delay_depart
                                          ifelse(delay_departure_data$delay_departure_min < 0, "landed earlier",
                                                 "on time"))
 print(table(delay_departure_data$delay_departure))
-#delay_departure_data <- delay_departure_data[delay_departure_data$delay_departure == "delayed",]
 ```
 
 We can also look how many minutes on average the deviation from the planned depature time is.
@@ -192,7 +207,7 @@ ggplot(average_delay_destination_departures, aes(x = as.Date(paste(departure_sch
   geom_bar(stat = "identity", fill = "steelblue") +
   scale_x_date(date_labels = "%b %Y", date_breaks = "1 year") +
   labs(x = "Month", y = "Average Departure Delay (Minutes)") +
-  ggtitle("Departures from Munich Airport")
+  ggtitle("Average Departure Delay of flights from Munich Airport")
 ```
 
 There also seems to be a difference in how much the average delay is depending on the month.
@@ -215,6 +230,7 @@ ggplot(delay_departure_data %>% filter(departure_scheduled_year_local %in% years
   coord_cartesian(ylim = c(0, 100))
 
 ```
+
 Furthermore, there also seems to be differences depending on the time of day (hour of the day) as to how severe the delay of the departure of flights is. 
 
 ```{r}
@@ -270,23 +286,26 @@ Let's have a look at how the weather might have an influence on delays. Let's ha
 top_weather_delay <- delay_departure_data %>%
   group_by(weather_description) %>%
   summarise(delay_mean = mean(delay_departure_min), delay_median = median(delay_departure_min), count = n()) %>%
-  #filter(count >= 365) %>%
   arrange(-delay_mean)
 
 top_weather_delay
 ```
-We can also look at how temperature affects delays
+We can also look at how temperature affects departure delays. The values of the temperature are always integers in the historical weather data I collected.
 
 ```{r}
 average_delay_temperature <- delay_departure_data %>%
   group_by(temperature_celsius) %>%
-  summarize(average_delay = mean(delay_departure_min))
+  summarize(average_delay = mean(delay_departure_min), count = n())
 
 ggplot(average_delay_temperature, aes(x = temperature_celsius, y = average_delay)) +
   geom_bar(stat = "identity", fill = "steelblue") +
   labs(x = "Temperature (Celsius)", y = "Average Departure Delay (Minutes)") +
   ggtitle("Influence of Temperature on Departure Delay") +
   coord_cartesian(ylim = c(0, 100))
+```
+
+```{r}
+average_delay_temperature
 ```
 
 ```{r}
@@ -297,7 +316,7 @@ average_delay_wind <- delay_departure_data %>%
 ggplot(average_delay_wind, aes(x = wind_speed_km, y = average_delay)) +
   geom_bar(stat = "identity", fill = "steelblue") +
   labs(x = "Wind Speed (km/h)", y = "Average Departure Delay (Minutes)") +
-  ggtitle("Influence of Temperature on Departure Delay") +
+  ggtitle("Influence of Wind Speed on Departure Delay") +
   coord_cartesian(ylim = c(0, 100))
 
 ```
