@@ -92,7 +92,6 @@ dataset <- cbind(dataset, model.matrix(~ weather_description - 1, data = departu
 dataset
 ```
 
-
 Remove Outliers
 
 ```{r}
@@ -127,9 +126,9 @@ test_df$temperature_celsius <- ifelse(is.na(test_df$temperature_celsius), averag
 ```
 
 ```{r}
-category_quantiles <- quantile(train_df$delay_departure_min, probs = c(0.0, 0.25, 0.5, 0.75, 1.0))
-category_quantiles
+category_quantiles <- quantile(train_df$delay_departure_min, probs = c(0.0, 0.2, 0.4, 0.6, 0.8, 1.0))
 ```
+
 
 ```{r}
 train_df$delay_departure_min_category <- cut(train_df$delay_departure_min, 
@@ -142,6 +141,8 @@ test_df$delay_departure_min_category <- cut(test_df$delay_departure_min,
                                              include.lowest = TRUE)
 ```
 
+# ------ Train Model --------
+
 ```{r}
 set.seed(42)
 ctrl <- trainControl(verboseIter = TRUE, method = "cv", number = 5)
@@ -150,12 +151,19 @@ filtered_train_df <- train_df[sample(nrow(train_df), 2000),
                               -(which(names(train_df) %in% c("departure_scheduled_datetime_local", "delay_departure_min")))]
 
 
-model <- train(delay_departure_min_category ~ .,
-               data = filtered_train_df,
-               method = "rf", trControl = ctrl)
+model <- train(delay_departure_min_category ~ departure_scheduled_weekday_local +
+         departure_scheduled_hour_local +
+         departure_scheduled_month_local +
+         departure_scheduled_year_local +
+         temperature_celsius,
+         data = filtered_train_df,
+         method = "rf", trControl = ctrl)
 
 print(model)
 ```
+
+
+# ------ Evaluate using test data --------
 
 ```{r}
 filtered_test_df <- test_df[-(which(names(test_df) %in% c("departure_scheduled_datetime_local", "delay_departure_min")))]

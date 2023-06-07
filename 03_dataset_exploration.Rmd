@@ -190,10 +190,36 @@ delay_departure_data$delay_departure <- ifelse(delay_departure_data$delay_depart
 print(table(delay_departure_data$delay_departure))
 ```
 
-We can also look how many minutes on average the deviation from the planned depature time is.
+We can also look how many minutes on average the deviation from the planned departure time is.
 
 ```{r}
 summary(delay_departure_data$delay_departure_min)
+```
+
+Between the 0.2 and the 0.8 quantile the slope is fairly constant, while between the 0.8 and the 1.0 qunatil one can see a clear increase. Between the 0.0 and the 0.2 quantile, the slope is at 0 for a long time, which can be explained by the fact that many flights have exactly 0 minutes delay (see bar chart below this plot).
+
+```{r}
+step <- 0.001
+category_quantiles <- quantile(delay_departure_data$delay_departure_min, probs = seq(0, 1, by = step))
+plot(seq(0, 1, by = step), category_quantiles, type = "l", 
+     xlab = "Quantile", ylab = "Delay in minutes", 
+     main = "Quantiles for flight delay", 
+      ylim = c(-50, 50)
+    )
+     
+
+grid()
+legend("topleft", legend = "Quantile", lty = 1, col = "blue")
+```
+
+```{r}
+minutes <- seq(min(delay_departure_data$delay_departure_min), max(delay_departure_data$delay_departure_min), by = 1)
+hist(delay_departure_data$delay_departure_min, breaks = minutes, 
+     xlab = "Delay in minutes", ylab = "Frequency", 
+     main = "Distribution of Departure Delay in 1-Minute Intervals",
+     xlim = c(-20, 100),
+     #ylim = c(0, 8000)
+     )
 ```
 
 Looking at the average number of minutes of delay for all months, it is noticeable that in the years that were heavily affected by the Covid 19 pandemic (2020 and 2021), the number of minutes of delay was lower than before and after that time.
@@ -318,7 +344,6 @@ ggplot(average_delay_wind, aes(x = wind_speed_km, y = average_delay)) +
   labs(x = "Wind Speed (km/h)", y = "Average Departure Delay (Minutes)") +
   ggtitle("Influence of Wind Speed on Departure Delay") +
   coord_cartesian(ylim = c(0, 100))
-
 ```
 
 

@@ -1,0 +1,22 @@
+---
+title: "01_crawl_tweets_for_flights"
+author: "Nils Hellwig"
+date: "6/6/2023"
+output: html_document
+---
+
+First, we can load all the departures
+
+```{r}
+departure_data <- read.csv("datasets/departure_dataset.csv")
+```
+
+Now I can load all the possible values for column $flight_number to collect all tweets for each flight number
+
+```{r}
+flight_numbers <- unique(departure_data$flight_number)
+for (flight in flight_numbers[0:10]) {
+  print(flight)
+}
+```
+
