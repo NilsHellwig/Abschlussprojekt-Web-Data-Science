@@ -1,0 +1,131 @@
+---
+title: "02_analyse_tweets"
+output:
+  pdf_document: default
+  html_document: default
+date: "2023-06-08"
+---
+
+```{r}
+library(tidytext)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(tm)
+library(SnowballC)
+library(sentimentr)
+library(topicmodels)
+```
+
+Load Dataset
+
+```{r}
+departure_data <- read.csv("datasets/departure_dataset.csv")
+flight_tweets <- read.csv("datasets/flight_tweets.csv")
+```
+
+```{r}
+flight_tweets <- flight_tweets[flight_tweets$lang == "en" | flight_tweets$lang == "de",]
+```
+
+```{r}
+z_scores <- scale(departure_data$delay_departure_min)
+z_threshold <- 3
+outliers_departure_data<- abs(z_scores) > z_threshold
+departure_data <- departure_data[!outliers_departure_data, ]
+```
+
+```{r}
+flights_tweets_most_frequent_users <- flight_tweets %>%
+  group_by(username) %>%
+  summarize(count = n()) %>%
+  arrange(desc(count))
+
+frequent_users <- flights_tweets_most_frequent_users %>% 
+  filter(count >= 3) %>% 
+  select(username)
+print(flights_tweets_most_frequent_users)
+
+flight_tweets <- anti_join(flight_tweets, frequent_users, by = "username")
+print(flight_tweets)
+
+```
+
+Now let's explore the dataset. Let's take a look for which airlines the most tweets could be collected.
+
+```{r}
+flights_tweets_most_frequent_flight <- flight_tweets %>%
+  group_by(flight_number) %>%
+  summarize(count = n()) %>%
+  arrange(desc(count))
+
+flights_tweets_most_frequent_flight
+```
+
+```{r}
+flights_metadata <- departure_data %>%
+  group_by(flight_number) %>%
+  summarize(count = n(), avg_delay_min = mean(delay_departure_min)) 
+
+flights_metadata
+```
+
+```{r}
+flight_tweets
+```
+
+```{r}
+flight_tweets <- flight_tweets %>%
+  mutate(content_cleaned = str_to_lower(content)) %>%
+  mutate(content_cleaned = gsub("(https?:\\/\\/)?(www\\.)?(\\w)+(\\w|\\.|\\/)*\\.(\\w)+(\\w|\\.|\\/|\\?|\\=|\\&)*", "", content_cleaned)) %>%
+  mutate(content_cleaned = removePunctuation(content_cleaned)) %>%
+  mutate(content_cleaned = removeNumbers(content_cleaned)) %>%
+  mutate(content_cleaned = ifelse(lang == "en", removeWords(content_cleaned, stopwords("en")), removeWords(content_cleaned, stopwords("de")))) %>%
+  mutate(content_cleaned = stripWhitespace(content_cleaned)) %>%
+  mutate(content_cleaned = ifelse(lang == "en", wordStem(content_cleaned, language = "english"), wordStem(content_cleaned, language = "german"))) %>%
+  mutate(sentiment_score = sentiment(content_cleaned)$sentiment)
+
+flight_tweets
+```
+
+```{r}
+flight_tweets <- flight_tweets %>%
+  left_join(flights_metadata, by = c("flight_number" = "flight_number"))
+flight_tweets
+```
+
+
+```{r}
+correlation <- cor(flight_tweets$sentiment_score, flight_tweets$avg_delay_min, use = "complete.obs", method = "pearson")
+print(correlation)
+plot(flight_tweets$sentiment_score, flight_tweets$avg_delay_min, xlab = "Sentiment Score", ylab = "Average Delay (minutes)", main = "Scatter Plot of Sentiment Score vs. Average Delay")
+abline(lm(avg_delay_min ~ sentiment_score, data = flight_tweets), col = "red")
+```
+```{r}
+# t-test for correlation coefficients
+correlation_test <- cor.test(flight_tweets$sentiment_score, flight_tweets$avg_delay_min, method = "pearson")
+correlation_test
+```
+
+Most frequent words
+
+```{r}
+all_tokens <- flight_tweets %>%
+  unnest_tokens(word, content_cleaned)
+
+word_frequencies <- all_tokens %>%
+  count(word, sort = TRUE)
+
+word_frequencies
+```
+
+```{r}
+bigrams <- flight_tweets %>%
+  unnest_tokens(bigram, content_cleaned, token = "ngrams", n = 2)
+
+bigram_frequencies <- bigrams %>%
+  count(bigram, sort = TRUE)
+
+bigram_frequencies
+```
+

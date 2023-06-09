@@ -2,21 +2,114 @@
 title: "01_crawl_tweets_for_flights"
 author: "Nils Hellwig"
 date: "6/6/2023"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
+
+```{r}
+library(reticulate)
+library(jsonlite)
+library(dplyr)
+library(tidyr)
+```
+
+Select Python Environment
+
+```{r}
+use_condaenv("/opt/conda")
+```
+
+```{r}
+system("pip install snscrape", intern=TRUE)
+```
 
 First, we can load all the departures
 
 ```{r}
 departure_data <- read.csv("datasets/departure_dataset.csv")
+departure_data
 ```
+
+```{r}
+departure_data$destination_name[departure_data$flight_number == "LH2304"][1]
+```
+
+
+I only need to collect the tweets with the lowest date
+
+```{r}
+lowest_date <- format(min(as.Date(departure_data$departure_scheduled_datetime_local)), "%Y-%m-%d")
+highest_date <- format(max(as.Date(departure_data$departure_scheduled_datetime_local)), "%Y-%m-%d")
+```
+
 
 Now I can load all the possible values for column $flight_number to collect all tweets for each flight number
 
 ```{r}
 flight_numbers <- unique(departure_data$flight_number)
-for (flight in flight_numbers[0:10]) {
-  print(flight)
+```
+
+```{r}
+for (flight_name in flight_numbers) {
+  twitter_search_prompt <- paste0('"', flight_name, " (", 
+                                  departure_data$destination_name[departure_data$flight_number == flight_name][1], 
+                                  ") OR (" , departure_data$airline_name[departure_data$flight_number == flight_name][1], 
+                                  ") OR (", departure_data$destination_country[departure_data$flight_number == flight_name][1],
+                                  ") OR (", departure_data$destination_IATA[departure_data$flight_number == flight_name][1], 
+                                  ") OR (munich) OR (MUC) OR (airport) OR (airline) OR (aircraft) OR (flight) OR (münchen) OR (flughafen) OR (flug) OR (depart) OR (departed) OR (departing) OR (departure) OR (abflug) OR (abheben) OR (abgehoben) OR (fliege) OR (fliegt) OR (jet) OR (flugzeug) OR (terminal) OR (gate) OR (flugzeit) OR (flight duration) OR (flying) OR (flying time) OR (passagier) OR (passenger) OR (delay) OR (verspätung)",
+                                  " -from:@", flight_name, " since:", lowest_date,  '"')
+  
+  print(twitter_search_prompt)
+
+  path_save <- paste0("datasets/flight_tweets/tweets_", flight_name, ".json")
+  command <- paste0("snscrape --jsonl --progress --max-results 10000"," twitter-search ", twitter_search_prompt, " > ", path_save)
+
+  system(command)
 }
 ```
 
+```{r}
+# The (Python) package I used to collect the tweets (snscrape) inserts a json object in each line of the file for each individual tweet. 
+# No "," is inserted between the objects by the tool and there are no square brackets around all objects. 
+# The .json files are not yet valid, so I have to do this manually.
+convertToValidJSONString <- function(file_name) {
+  file_lines <- readLines(file_name)
+
+  # There were flight numbers for which I could not collect tweets because no tweets were posted about them
+  if (length(file_lines) == 0) {
+    return (FALSE)
+  }
+  
+  if (length(file_lines) > 1) {
+    file_lines[-length(file_lines)] <- paste0(file_lines[-length(file_lines)], ",")
+  }
+  
+  json_string <- paste(c("[", file_lines, "]"), collapse = "")
+  return(json_string)
+}
+
+```
+
+
+```{r}
+tweets_df <- data.frame()
+
+for (flight_number in flight_numbers) {
+  file_name <- paste0("datasets/flight_tweets/tweets_", flight_number, ".json")
+  json_string <- convertToValidJSONString(file_name)
+  if (json_string != FALSE) {
+     tweets <- as.data.frame(fromJSON(json_string)[c("username", "url", "date", "content", "replyCount", "retweetCount", "likeCount", "quoteCount", "lang", "viewCount", "bookmarkCount")])
+  
+     tweets$flight_number <- flight_number
+     tweets_df <- bind_rows(tweets_df, tweets) 
+  }
+}
+
+tweets_df <- tweets_df %>%
+  arrange(date)
+
+write.csv(tweets_df, file = "datasets/flight_tweets.csv", row.names = FALSE)
+
+tweets_df
+```

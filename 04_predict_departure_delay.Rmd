@@ -12,6 +12,7 @@ library(ggplot2)
 library(dplyr)
 library(stringr)
 library(caret)
+library(e1071)
 ```
 
 # Load Datasets
@@ -51,6 +52,15 @@ departure_data <- merge(departure_data, weather_data[, c(merge_cols_weather_data
 # For a better understanding of what data is in this column
 departure_data <- departure_data %>%
   rename(weather_description = description)
+
+# There are cases where no weather description is given but other weather data such as temperature is available. 
+# In this case, I set a value for these cases so that the value is not NA but such cases get their own column for the one-hot encoding.
+departure_data$weather_description <- ifelse(is.na(departure_data$weather_description), "Notspecified", departure_data$weather_description)
+
+# Since there should be a separate column for each value for weather_description later, which then has its value as the column name, I remove all "." and spaces so that you can access the column name later using $ in R.
+departure_data$weather_description <- gsub("[. ]", "", departure_data$weather_description)
+departure_data$airline_name <- gsub("[. ]", "", departure_data$airline_name)
+departure_data$destination_IATA <- gsub("[. ]", "", departure_data$destination_IATA)
 ```
 
 As I want to predict the amount of delay, I will only look at flights that have landed
@@ -74,23 +84,21 @@ dataset <- departure_data %>%
 ```
 
 ```{r}
-dataset$departure_scheduled_weekday_local <- as.numeric(factor(dataset$departure_scheduled_weekday_local,
+dataset$departure_scheduled_weekday_local <- as.integer(factor(dataset$departure_scheduled_weekday_local,
                                                                       levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"),
                                                                       labels = 1:7))
-```
-
-```{r}
-# There are cases where no weather description is given but other weather data such as temperature is available. 
-# In this case, I set a value for these cases so that the value is not NA but such cases get their own column for the one-hot encoding.
-departure_data$weather_description <- ifelse(is.na(departure_data$weather_description), "Not specified", departure_data$weather_description)
-```
-
-```{r}
-dataset <- cbind(dataset, model.matrix(~ airline_name - 1, data = departure_data))
-dataset <- cbind(dataset, model.matrix(~ destination_IATA - 1, data = departure_data))
-dataset <- cbind(dataset, model.matrix(~ weather_description - 1, data = departure_data))
 dataset
 ```
+
+```{r}
+# One-Hot Encoding for categorical variables
+# If MARGIN = 2 is set, this means that the function iterates over the columns of the matrix.
+dataset <- cbind(dataset, apply(model.matrix(~ weather_description - 1, data = departure_data), 2, as.integer)) 
+dataset <- cbind(dataset, apply(model.matrix(~ airline_name - 1, data = departure_data), 2, as.integer))
+dataset <- cbind(dataset, apply(model.matrix(~ destination_IATA - 1, data = departure_data), 2, as.integer))
+dataset
+```
+
 
 Remove Outliers
 
@@ -101,19 +109,22 @@ outliers_train_df <- abs(z_scores) > z_threshold
 dataset <- dataset[!outliers_train_df, ]
 ```
 
-# To-Do: Schauen was man macht, wenn ein Wert fehlt (Celsius!)
-# To-Do woche diskret?
-# To-Do: Luftdruck?
-# To-Do: Delay als Spalte
-
 # ------ Split Dataset to train/test --------
 
 Split Dataset
 
 ```{r}
 scheduled_departure_dates <- as.Date(dataset$departure_scheduled_datetime_local)
-train_df <- subset(dataset, scheduled_departure_dates < max(scheduled_departure_dates) - 365)
-test_df <- subset(dataset, scheduled_departure_dates >= max(scheduled_departure_dates) - 365)
+#train_df <- subset(dataset, scheduled_departure_dates < max(scheduled_departure_dates) - 365)
+#test_df <- subset(dataset, scheduled_departure_dates >= max(scheduled_departure_dates) - 365)
+
+train_df <- subset(dataset, scheduled_departure_dates >= max(scheduled_departure_dates) - 365 & scheduled_departure_dates <= max(scheduled_departure_dates) - 335)
+test_df <- subset(dataset, scheduled_departure_dates >= max(scheduled_departure_dates) - 334 & scheduled_departure_dates <= max(scheduled_departure_dates) - 304)
+
+#set.seed(123)  # Set a seed for reproducibility
+#train_indices <- sample(nrow(dataset), nrow(dataset) * 0.8)
+#train_df <- dataset[train_indices, ]
+#test_df <- dataset[-train_indices, ]
 ```
 
 Add temperature
@@ -126,18 +137,19 @@ test_df$temperature_celsius <- ifelse(is.na(test_df$temperature_celsius), averag
 ```
 
 ```{r}
-category_quantiles <- quantile(train_df$delay_departure_min, probs = c(0.0, 0.2, 0.4, 0.6, 0.8, 1.0))
+category_quantiles <- quantile(train_df$delay_departure_min, probs = c(0.0, 0.2, 0.5, 0.8, 1.0))
 ```
 
 
 ```{r}
+category_names_quantiles <- c("earlier, on time or very short delay", "short delay", "medium", "long delay")
 train_df$delay_departure_min_category <- cut(train_df$delay_departure_min, 
                                              breaks = category_quantiles, 
-                                             labels = c("on time or earlier", "short delay", "medium delay", "long delay"),
+                                             labels = category_names_quantiles,
                                              include.lowest = TRUE)
 test_df$delay_departure_min_category <- cut(test_df$delay_departure_min, 
                                              breaks = category_quantiles, 
-                                             labels = c("on time or earlier", "short delay", "medium delay", "long delay"),
+                                             labels = category_names_quantiles,
                                              include.lowest = TRUE)
 ```
 
@@ -147,30 +159,49 @@ test_df$delay_departure_min_category <- cut(test_df$delay_departure_min,
 set.seed(42)
 ctrl <- trainControl(verboseIter = TRUE, method = "cv", number = 5)
 
-filtered_train_df <- train_df[sample(nrow(train_df), 2000), 
-                              -(which(names(train_df) %in% c("departure_scheduled_datetime_local", "delay_departure_min")))]
+filtered_train_df <- train_df[-(which(names(train_df) %in% c("departure_scheduled_datetime_local", "delay_departure_min")))]
+
+filtered_train_df <- subset(filtered_train_df, !(delay_departure_min_category %in% c("short delay", "medium")))
+filtered_train_df$delay_departure_min_category <- as.character(filtered_train_df$delay_departure_min_category)
 
 
-model <- train(delay_departure_min_category ~ departure_scheduled_weekday_local +
-         departure_scheduled_hour_local +
-         departure_scheduled_month_local +
-         departure_scheduled_year_local +
-         temperature_celsius,
+#tune_grid <- expand.grid(mtry = c(50))
+
+model <- train(delay_departure_min_category ~ .,
          data = filtered_train_df,
-         method = "rf", trControl = ctrl)
+         method = "rf", 
+         trControl = ctrl,
+       #  tuneGrid=tune_grid
+         )
 
 print(model)
 ```
 
+```{r}
+table(filtered_train_df$delay_departure_min_category)
+```
 
 # ------ Evaluate using test data --------
 
 ```{r}
-filtered_test_df <- test_df[-(which(names(test_df) %in% c("departure_scheduled_datetime_local", "delay_departure_min")))]
+filtered_test_df <- test_df
+filtered_test_df <- filtered_test_df[filtered_test_df$delay_departure_min_category == "earlier, on time or very short delay" | filtered_test_df$delay_departure_min_category == "long delay", ]
+
+#filtered_test_df[filtered_test_df$delay_departure_min_category == "medium", "delay_departure_min_category"] <- "long delay"
+#filtered_test_df[filtered_test_df$delay_departure_min_category == "short delay", "delay_departure_min_category"] <- "earlier, on time or very short delay"
+filtered_test_df$delay_departure_min_category <- droplevels(filtered_test_df$delay_departure_min_category)
+filtered_test_df <- filtered_test_df[complete.cases(filtered_test_df$delay_departure_min_category), ]
+
+
 predictions <- predict(model, newdata = filtered_test_df)
 
 # Evaluate the model performance
-confusionMatrix(predictions, test_df$delay_departure_min_category)
+cf <- confusionMatrix(predictions, filtered_test_df$delay_departure_min_category)
+cf
 ```
 
-
+```{r}
+# next: andere testdaten
+feature_importance <- varImp(model)
+feature_importance
+```
