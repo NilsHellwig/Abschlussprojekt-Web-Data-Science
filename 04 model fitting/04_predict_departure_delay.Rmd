@@ -21,8 +21,8 @@ First, we need to load the dataset and add some columns that will be used for fe
 
 ```{r}
 # Load departure data
-departure_data <- read.csv("datasets/departure_dataset.csv")
-weather_data <- read.csv("datasets/weather_munich_dataset.csv")
+departure_data <- read.csv("../datasets/departure_dataset.csv")
+weather_data <- read.csv("../datasets/weather_munich_dataset.csv")
 ```
 
 ```{r}
@@ -99,7 +99,6 @@ dataset <- cbind(dataset, apply(model.matrix(~ destination_IATA - 1, data = depa
 dataset
 ```
 
-
 Remove Outliers
 
 ```{r}
@@ -109,99 +108,129 @@ outliers_train_df <- abs(z_scores) > z_threshold
 dataset <- dataset[!outliers_train_df, ]
 ```
 
+```{r}
+dataset[order(dataset$departure_scheduled_datetime_local), ]
+```
+
+```{r}
+dataset <- dataset %>%
+  filter(!(departure_scheduled_year_local == 2017 & departure_scheduled_month_local == 9)) %>%
+  filter(!(departure_scheduled_year_local == 2023 & departure_scheduled_month_local == 5))
+```
+
+
+```{r}
+year_month_pairs <- dataset %>%
+  group_by(departure_scheduled_month_local, departure_scheduled_year_local) %>%
+  summarise(average_delay = mean(delay_departure_min)) %>%
+  arrange(departure_scheduled_year_local, departure_scheduled_month_local)
+year_month_pairs
+```
+
+Define Classes
+
+```{r}
+category_names_quantiles <- c("earlier, on time or very short delay", "long delay")
+category_quantiles <- quantile(dataset$delay_departure_min, probs = c(0.0, 0.5, 1.0))
+category_quantiles
+```
+
 # ------ Split Dataset to train/test --------
-
-Split Dataset
-
-```{r}
-scheduled_departure_dates <- as.Date(dataset$departure_scheduled_datetime_local)
-#train_df <- subset(dataset, scheduled_departure_dates < max(scheduled_departure_dates) - 365)
-#test_df <- subset(dataset, scheduled_departure_dates >= max(scheduled_departure_dates) - 365)
-
-train_df <- subset(dataset, scheduled_departure_dates >= max(scheduled_departure_dates) - 365 & scheduled_departure_dates <= max(scheduled_departure_dates) - 335)
-test_df <- subset(dataset, scheduled_departure_dates >= max(scheduled_departure_dates) - 334 & scheduled_departure_dates <= max(scheduled_departure_dates) - 304)
-
-#set.seed(123)  # Set a seed for reproducibility
-#train_indices <- sample(nrow(dataset), nrow(dataset) * 0.8)
-#train_df <- dataset[train_indices, ]
-#test_df <- dataset[-train_indices, ]
-```
-
-Add temperature
-
-```{r}
-average_temperature_train <- mean(train_df$temperature_celsius, na.rm = TRUE)
-average_temperature_test <- mean(test_df$temperature_celsius, na.rm = TRUE)
-train_df$temperature_celsius <- ifelse(is.na(train_df$temperature_celsius), average_temperature_train, train_df$temperature_celsius)
-test_df$temperature_celsius <- ifelse(is.na(test_df$temperature_celsius), average_temperature_test, test_df$temperature_celsius)
-```
-
-```{r}
-category_quantiles <- quantile(train_df$delay_departure_min, probs = c(0.0, 0.2, 0.5, 0.8, 1.0))
-```
-
-
-```{r}
-category_names_quantiles <- c("earlier, on time or very short delay", "short delay", "medium", "long delay")
-train_df$delay_departure_min_category <- cut(train_df$delay_departure_min, 
-                                             breaks = category_quantiles, 
-                                             labels = category_names_quantiles,
-                                             include.lowest = TRUE)
-test_df$delay_departure_min_category <- cut(test_df$delay_departure_min, 
-                                             breaks = category_quantiles, 
-                                             labels = category_names_quantiles,
-                                             include.lowest = TRUE)
-```
-
-# ------ Train Model --------
 
 ```{r}
 set.seed(42)
-ctrl <- trainControl(verboseIter = TRUE, method = "cv", number = 5)
-
-filtered_train_df <- train_df[-(which(names(train_df) %in% c("departure_scheduled_datetime_local", "delay_departure_min")))]
-
-filtered_train_df <- subset(filtered_train_df, !(delay_departure_min_category %in% c("short delay", "medium")))
-filtered_train_df$delay_departure_min_category <- as.character(filtered_train_df$delay_departure_min_category)
+```
 
 
-#tune_grid <- expand.grid(mtry = c(50))
+```{r}
+train_model <- function () {
+  ctrl <- trainControl(verboseIter = TRUE, method="none")#, method = "cv", number = 5)
+  filtered_train_df <- train_df[-(which(names(train_df) %in% c("departure_scheduled_datetime_local", "delay_departure_min")))]
+  #filtered_train_df <- subset(filtered_train_df, !(delay_departure_min_category %in% c("short delay", "medium")))
+  filtered_train_df$delay_departure_min_category <- as.character(filtered_train_df$delay_departure_min_category)
 
-model <- train(delay_departure_min_category ~ .,
+  model <- train(delay_departure_min_category ~ .,
          data = filtered_train_df,
          method = "rf", 
          trControl = ctrl,
-       #  tuneGrid=tune_grid
          )
-
-print(model)
+  return(model)
+}
 ```
 
 ```{r}
-table(filtered_train_df$delay_departure_min_category)
-```
-
-# ------ Evaluate using test data --------
-
-```{r}
-filtered_test_df <- test_df
-filtered_test_df <- filtered_test_df[filtered_test_df$delay_departure_min_category == "earlier, on time or very short delay" | filtered_test_df$delay_departure_min_category == "long delay", ]
-
-#filtered_test_df[filtered_test_df$delay_departure_min_category == "medium", "delay_departure_min_category"] <- "long delay"
-#filtered_test_df[filtered_test_df$delay_departure_min_category == "short delay", "delay_departure_min_category"] <- "earlier, on time or very short delay"
-filtered_test_df$delay_departure_min_category <- droplevels(filtered_test_df$delay_departure_min_category)
-filtered_test_df <- filtered_test_df[complete.cases(filtered_test_df$delay_departure_min_category), ]
-
-
-predictions <- predict(model, newdata = filtered_test_df)
-
-# Evaluate the model performance
-cf <- confusionMatrix(predictions, filtered_test_df$delay_departure_min_category)
-cf
+results_df <- data.frame()
 ```
 
 ```{r}
-# next: andere testdaten
-feature_importance <- varImp(model)
-feature_importance
+evaluate_model <- function () {
+  filtered_test_df <- test_df
+  filtered_test_df$delay_departure_min_category <- droplevels(filtered_test_df$delay_departure_min_category)
+  predictions <- predict(model, newdata = filtered_test_df)
+
+  cf <- confusionMatrix(predictions, filtered_test_df$delay_departure_min_category)
+  feature_importance <- varImp(model, scale=FALSE)
+  
+  row_index <- which(year_month_pairs$departure_scheduled_month_local == 10 &
+                   year_month_pairs$departure_scheduled_year_local == 2017)
+  
+  new_row <- c(cf$overall, year_start_test = year_start_test, month_start_test=month_start_test) 
+  print(new_row)
+  results_df <- rbind(results_df, new_row)
+  colnames(results_df) <- c(names(cf$overall), "year_start_test", "month_start_test")
+  
+  ##########
+  col_index <- feature_importance$importance %>% 
+    mutate(names=row.names(.)) %>%
+    arrange(names) %>%
+    t() %>%
+    as.data.frame()
+  print(col_index)
+
+  ##########
+  
+  
+  
+  
+  return(results_df)
+}
 ```
+
+```{r}
+evaluate_model()
+```
+
+```{r}
+#for (i in seq(1, nrow(year_month_pairs) - 1)) {
+for (i in seq(1, 1)) {
+  year_start_train <- year_month_pairs$departure_scheduled_year_local[[i]]
+  year_start_test <- year_month_pairs$departure_scheduled_year_local[[i+1]]
+  month_start_train <- year_month_pairs$departure_scheduled_month_local[[i]]
+  month_start_test <- year_month_pairs$departure_scheduled_month_local[[i+1]]
+  train_df <- dataset %>%
+    filter(departure_scheduled_year_local == year_start_train & departure_scheduled_month_local == month_start_train)
+  test_df <- dataset %>%
+    filter(departure_scheduled_year_local == year_start_test & departure_scheduled_month_local == month_start_test)
+  
+  # Add Labels
+  train_df$delay_departure_min_category <- cut(train_df$delay_departure_min, 
+                                             breaks = category_quantiles, 
+                                             labels = category_names_quantiles,
+                                             include.lowest = TRUE)
+  
+  test_df$delay_departure_min_category <- cut(test_df$delay_departure_min, 
+                                             breaks = category_quantiles, 
+                                             labels = category_names_quantiles,
+                                             include.lowest = TRUE) 
+  
+  # Replace NA with average temeperature
+  average_temperature_train <- mean(train_df$temperature_celsius, na.rm = TRUE)
+  average_temperature_test <- mean(test_df$temperature_celsius, na.rm = TRUE)
+  train_df$temperature_celsius <- ifelse(is.na(train_df$temperature_celsius), average_temperature_train, train_df$temperature_celsius)
+  test_df$temperature_celsius <- ifelse(is.na(test_df$temperature_celsius), average_temperature_test, test_df$temperature_celsius)
+  
+  model <- train_model()
+  results_df <- evaluate_model()
+}
+```
+
