@@ -23,6 +23,7 @@ First, we need to load the dataset and add some columns that will be used for fe
 # Load departure data
 departure_data <- read.csv("../datasets/departure_dataset.csv")
 weather_data <- read.csv("../datasets/weather_munich_dataset.csv")
+departure_data
 ```
 
 ```{r}
@@ -61,6 +62,7 @@ departure_data$weather_description <- ifelse(is.na(departure_data$weather_descri
 departure_data$weather_description <- gsub("[. ]", "", departure_data$weather_description)
 departure_data$airline_name <- gsub("[. ]", "", departure_data$airline_name)
 departure_data$destination_IATA <- gsub("[. ]", "", departure_data$destination_IATA)
+departure_data
 ```
 
 As I want to predict the amount of delay, I will only look at flights that have landed
@@ -144,9 +146,8 @@ set.seed(42)
 
 ```{r}
 train_model <- function () {
-  ctrl <- trainControl(verboseIter = TRUE, method="none")#, method = "cv", number = 5)
+  ctrl <- trainControl(verboseIter = TRUE, method="none")
   filtered_train_df <- train_df[-(which(names(train_df) %in% c("departure_scheduled_datetime_local", "delay_departure_min")))]
-  #filtered_train_df <- subset(filtered_train_df, !(delay_departure_min_category %in% c("short delay", "medium")))
   filtered_train_df$delay_departure_min_category <- as.character(filtered_train_df$delay_departure_min_category)
 
   model <- train(delay_departure_min_category ~ .,
@@ -170,43 +171,33 @@ evaluate_model <- function () {
 
   cf <- confusionMatrix(predictions, filtered_test_df$delay_departure_min_category)
   feature_importance <- varImp(model, scale=FALSE)
+  print(feature_importance)
   
-  row_index <- which(year_month_pairs$departure_scheduled_month_local == 10 &
-                   year_month_pairs$departure_scheduled_year_local == 2017)
-  
-  new_row <- c(cf$overall, year_start_test = year_start_test, month_start_test=month_start_test) 
-  print(new_row)
-  results_df <- rbind(results_df, new_row)
-  colnames(results_df) <- c(names(cf$overall), "year_start_test", "month_start_test")
-  
-  ##########
-  col_index <- feature_importance$importance %>% 
+  feature_importance_row <- feature_importance$importance %>% 
     mutate(names=row.names(.)) %>%
     arrange(names) %>%
     t() %>%
     as.data.frame()
-  print(col_index)
 
-  ##########
-  
-  
-  
-  
+  new_row <- c(year_start_test = year_start_test, month_start_test=month_start_test, cf$overall, as.character(unlist(feature_importance_row["Overall", ]))) 
+  results_df <- rbind(results_df, new_row)
+  colnames(results_df) <- c("year_start_test", "month_start_test", names(cf$overall), colnames(feature_importance_row))
   return(results_df)
 }
 ```
 
 ```{r}
-evaluate_model()
+#evaluate_model()
 ```
 
 ```{r}
 #for (i in seq(1, nrow(year_month_pairs) - 1)) {
-for (i in seq(1, 1)) {
+for (i in seq(1, 40)) {
   year_start_train <- year_month_pairs$departure_scheduled_year_local[[i]]
   year_start_test <- year_month_pairs$departure_scheduled_year_local[[i+1]]
   month_start_train <- year_month_pairs$departure_scheduled_month_local[[i]]
   month_start_test <- year_month_pairs$departure_scheduled_month_local[[i+1]]
+  
   train_df <- dataset %>%
     filter(departure_scheduled_year_local == year_start_train & departure_scheduled_month_local == month_start_train)
   test_df <- dataset %>%
@@ -232,5 +223,9 @@ for (i in seq(1, 1)) {
   model <- train_model()
   results_df <- evaluate_model()
 }
+```
+
+```{r}
+results_df
 ```
 
