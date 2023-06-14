@@ -170,8 +170,7 @@ evaluate_model <- function () {
   predictions <- predict(model, newdata = filtered_test_df)
 
   cf <- confusionMatrix(predictions, filtered_test_df$delay_departure_min_category)
-  feature_importance <- varImp(model, scale=FALSE)
-  print(feature_importance)
+  feature_importance <- varImp(model, scale=TRUE)
   
   feature_importance_row <- feature_importance$importance %>% 
     mutate(names=row.names(.)) %>%
@@ -182,21 +181,17 @@ evaluate_model <- function () {
   new_row <- c(year_start_test = year_start_test, month_start_test=month_start_test, cf$overall, as.character(unlist(feature_importance_row["Overall", ]))) 
   results_df <- rbind(results_df, new_row)
   colnames(results_df) <- c("year_start_test", "month_start_test", names(cf$overall), colnames(feature_importance_row))
-  
-  #print(colnames(feature_importance_row)[order(feature_importance_row["Overall", ], decreasing = TRUE)[1:10]])
-  
-  
   return(results_df)
 }
 ```
 
 ```{r}
-evaluate_model()
+#evaluate_model()
 ```
 
 ```{r}
 #for (i in seq(1, nrow(year_month_pairs) - 1)) {
-for (i in seq(1, 40)) {
+for (i in seq(1, 30)) {
   year_start_train <- year_month_pairs$departure_scheduled_year_local[[i]]
   year_start_test <- year_month_pairs$departure_scheduled_year_local[[i+1]]
   month_start_train <- year_month_pairs$departure_scheduled_month_local[[i]]
@@ -232,4 +227,3 @@ for (i in seq(1, 40)) {
 ```{r}
 write.csv(results_df, "results_rf.csv")
 ```
-

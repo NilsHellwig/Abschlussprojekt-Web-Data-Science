@@ -8,7 +8,13 @@ output: html_document
 ```{r}
 library(ggplot2)
 library(dplyr)
+library(tidyverse)
 ```
+
+```{r}
+top_n <- 1
+```
+
 
 ```{r}
 evaluation_results <- read.csv("results_rf.csv")
@@ -26,20 +32,20 @@ evaluation_results
 
 ```{r}
 feature_columns <- evaluation_results[, 11:ncol(evaluation_results)]
-once_listed_top_10_features <- vector("character")
+once_listed_top_n_features <- vector("character")
 
 for (i in 1:nrow(feature_columns)) {
   row_values <- unlist(feature_columns[i, ]) # i got an "cannot xtfrm data frames" error so i converted the row to a vector using unlist because sort can only handle vectors
   sorted_values <- sort(row_values, decreasing = TRUE)
   
-  # get top 10 features
-  top_names <- names(row_values)[match(sorted_values[1:10], row_values)]
-  once_listed_top_10_features <- c(once_listed_top_10_features, top_names)
+  # get top n features
+  top_names <- names(row_values)[match(sorted_values[1:top_n], row_values)]
+  once_listed_top_n_features <- c(once_listed_top_n_features, top_names)
 }
 
 # remove doublicates
-once_listed_top_10_features <- unique(once_listed_top_10_features)
-once_listed_top_10_features
+once_listed_top_n_features <- unique(once_listed_top_n_features)
+once_listed_top_n_features
 ```
 
 ```{r}
@@ -48,20 +54,30 @@ selected_feature_timeseries <- evaluation_results %>%
 selected_feature_timeseries
 ```
 
-```{r}
+```{r, fig.width = 10, fig.height= 3}
+selected_feature_timeseries <- evaluation_results %>%
+  select(all_of(once_listed_top_n_features), year_month)
 
-ggplot(data = selected_feature_timeseries, aes(x = year_month)) +
-  lapply(once_listed_top_10_features, function(feature) {
-    geom_line(aes_string(y = feature), color = "blue")
-  }) +
-  xlab("Year-Month") +
-  ylab("Feature Importance") +
-  ggtitle("Year-Month vs. Feature Importance")
+selected_feature_timeseries <- tidyr::gather(selected_feature_timeseries, key = "feature", value = "importance", -year_month)
+selected_feature_timeseries$year_month <- as.Date(paste0(selected_feature_timeseries$year_month, "-01"))
 
+x_labels <- unique(selected_feature_timeseries$year_month)
+
+for (year in unique(year(selected_feature_timeseries$year_month))) {
+  year_data <- subset(selected_feature_timeseries, year(selected_feature_timeseries$year_month) == year)
+  plot <- ggplot(year_data, aes(x = year_month, y = importance, color = feature)) +
+    geom_line() +
+    labs(x = "Month", y = "Variable Importance", color = "Feature") +
+    scale_x_date(breaks = x_labels, labels = format(x_labels, "%b %Y")) +
+    theme_minimal() +
+    ggtitle(paste("Year", year))
+
+  print(plot)  # oder ggsave(filename) zum Speichern des Plots als Bild
+}
 ```
 
 ```{r}
-
+selected_feature_timeseries
 ```
 
 
