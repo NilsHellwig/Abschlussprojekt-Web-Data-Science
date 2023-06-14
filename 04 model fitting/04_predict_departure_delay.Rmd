@@ -182,12 +182,16 @@ evaluate_model <- function () {
   new_row <- c(year_start_test = year_start_test, month_start_test=month_start_test, cf$overall, as.character(unlist(feature_importance_row["Overall", ]))) 
   results_df <- rbind(results_df, new_row)
   colnames(results_df) <- c("year_start_test", "month_start_test", names(cf$overall), colnames(feature_importance_row))
+  
+  #print(colnames(feature_importance_row)[order(feature_importance_row["Overall", ], decreasing = TRUE)[1:10]])
+  
+  
   return(results_df)
 }
 ```
 
 ```{r}
-#evaluate_model()
+evaluate_model()
 ```
 
 ```{r}
@@ -226,6 +230,6 @@ for (i in seq(1, 40)) {
 ```
 
 ```{r}
-results_df
+write.csv(results_df, "results_rf.csv")
 ```
 

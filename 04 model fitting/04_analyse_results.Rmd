@@ -1,0 +1,68 @@
+---
+title: "04_analyse_results"
+author: "Nils Hellwig"
+date: "6/14/2023"
+output: html_document
+---
+
+```{r}
+library(ggplot2)
+library(dplyr)
+```
+
+```{r}
+evaluation_results <- read.csv("results_rf.csv")
+
+evaluation_results <- evaluation_results %>%
+  mutate_at(vars(names(evaluation_results)), as.numeric)
+
+evaluation_results <- evaluation_results %>%
+  mutate(year_month = paste(year_start_test, month_start_test, sep = "-"))
+
+
+evaluation_results
+```
+
+
+```{r}
+feature_columns <- evaluation_results[, 11:ncol(evaluation_results)]
+once_listed_top_10_features <- vector("character")
+
+for (i in 1:nrow(feature_columns)) {
+  row_values <- unlist(feature_columns[i, ]) # i got an "cannot xtfrm data frames" error so i converted the row to a vector using unlist because sort can only handle vectors
+  sorted_values <- sort(row_values, decreasing = TRUE)
+  
+  # get top 10 features
+  top_names <- names(row_values)[match(sorted_values[1:10], row_values)]
+  once_listed_top_10_features <- c(once_listed_top_10_features, top_names)
+}
+
+# remove doublicates
+once_listed_top_10_features <- unique(once_listed_top_10_features)
+once_listed_top_10_features
+```
+
+```{r}
+selected_feature_timeseries <- evaluation_results %>%
+  select(departure_scheduled_hour_local, year_month)
+selected_feature_timeseries
+```
+
+```{r}
+
+ggplot(data = selected_feature_timeseries, aes(x = year_month)) +
+  lapply(once_listed_top_10_features, function(feature) {
+    geom_line(aes_string(y = feature), color = "blue")
+  }) +
+  xlab("Year-Month") +
+  ylab("Feature Importance") +
+  ggtitle("Year-Month vs. Feature Importance")
+
+```
+
+```{r}
+
+```
+
+
+
