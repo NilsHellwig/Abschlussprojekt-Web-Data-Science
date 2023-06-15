@@ -12,7 +12,8 @@ library(tidyverse)
 ```
 
 ```{r}
-top_n <- 1
+top_n <- 7
+model_name <- "rf"
 ```
 
 
@@ -20,33 +21,36 @@ top_n <- 1
 evaluation_results <- read.csv("results_rf.csv")
 
 evaluation_results <- evaluation_results %>%
-  mutate_at(vars(names(evaluation_results)), as.numeric)
-
-evaluation_results <- evaluation_results %>%
   mutate(year_month = paste(year_start_test, month_start_test, sep = "-"))
-
 
 evaluation_results
 ```
 
+## Calculate mean of each column
 
 ```{r}
-feature_columns <- evaluation_results[, 11:ncol(evaluation_results)]
-once_listed_top_n_features <- vector("character")
+metrics_df <- evaluation_results[, 4:21]
 
-for (i in 1:nrow(feature_columns)) {
-  row_values <- unlist(feature_columns[i, ]) # i got an "cannot xtfrm data frames" error so i converted the row to a vector using unlist because sort can only handle vectors
-  sorted_values <- sort(row_values, decreasing = TRUE)
-  
-  # get top n features
-  top_names <- names(row_values)[match(sorted_values[1:top_n], row_values)]
-  once_listed_top_n_features <- c(once_listed_top_n_features, top_names)
-}
+metrics <- data.frame(
+  Mean = apply(metrics_df, 2, mean),
+  Median = apply(metrics_df, 2, median),
+  Min = apply(metrics_df, 2, min),
+  Max = apply(metrics_df, 2, max),
+  Q1 = apply(metrics_df, 2, quantile, probs = 0.25),
+  Q3 = apply(metrics_df, 2, quantile, probs = 0.75)
+)
 
-# remove doublicates
-once_listed_top_n_features <- unique(once_listed_top_n_features)
-once_listed_top_n_features
+row.names(metrics) <- colnames(metrics_df)
+metrics
 ```
+
+```{r}
+feature_columns <- evaluation_results[, 22:ncol(evaluation_results)]
+column_means <- sapply(feature_columns, mean)
+sorted_means <- sort(column_means, decreasing = TRUE)
+top_n_columns <- names(sorted_means)[1:top_n]
+```
+
 
 ```{r}
 selected_feature_timeseries <- evaluation_results %>%
@@ -56,7 +60,7 @@ selected_feature_timeseries
 
 ```{r, fig.width = 10, fig.height= 3}
 selected_feature_timeseries <- evaluation_results %>%
-  select(all_of(once_listed_top_n_features), year_month)
+  select(all_of(top_n_columns), year_month)
 
 selected_feature_timeseries <- tidyr::gather(selected_feature_timeseries, key = "feature", value = "importance", -year_month)
 selected_feature_timeseries$year_month <- as.Date(paste0(selected_feature_timeseries$year_month, "-01"))
@@ -69,16 +73,11 @@ for (year in unique(year(selected_feature_timeseries$year_month))) {
     geom_line() +
     labs(x = "Month", y = "Variable Importance", color = "Feature") +
     scale_x_date(breaks = x_labels, labels = format(x_labels, "%b %Y")) +
-    theme_minimal() +
     ggtitle(paste("Year", year))
+  
+  filename <- paste("plots/", "plot_", model_name, "_", year, ".png", sep = "")
+  ggsave(filename, plot = plot, width = 20, height = 10, dpi = 300)
 
-  print(plot)  # oder ggsave(filename) zum Speichern des Plots als Bild
+  print(plot) 
 }
 ```
-
-```{r}
-selected_feature_timeseries
-```
-
-
-

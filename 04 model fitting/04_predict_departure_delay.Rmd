@@ -15,6 +15,12 @@ library(caret)
 library(e1071)
 ```
 
+# Settings
+
+```{r}
+set.seed(42)
+```
+
 # Load Datasets
 
 First, we need to load the dataset and add some columns that will be used for feature extraction (as already known from the data exploration script).
@@ -140,19 +146,15 @@ category_quantiles
 # ------ Split Dataset to train/test --------
 
 ```{r}
-set.seed(42)
-```
-
-
-```{r}
-train_model <- function () {
+train_model <- function (model_name="svmLinear") {
   ctrl <- trainControl(verboseIter = TRUE, method="none")
   filtered_train_df <- train_df[-(which(names(train_df) %in% c("departure_scheduled_datetime_local", "delay_departure_min")))]
   filtered_train_df$delay_departure_min_category <- as.character(filtered_train_df$delay_departure_min_category)
 
   model <- train(delay_departure_min_category ~ .,
          data = filtered_train_df,
-         method = "rf", 
+         method = model_name,
+         importance = TRUE,
          trControl = ctrl,
          )
   return(model)
@@ -168,39 +170,36 @@ evaluate_model <- function () {
   filtered_test_df <- test_df
   filtered_test_df$delay_departure_min_category <- droplevels(filtered_test_df$delay_departure_min_category)
   predictions <- predict(model, newdata = filtered_test_df)
-
   cf <- confusionMatrix(predictions, filtered_test_df$delay_departure_min_category)
-  feature_importance <- varImp(model, scale=TRUE)
+  feature_importance <- varImp(model)#, scale=TRUE)
   
   feature_importance_row <- feature_importance$importance %>% 
     mutate(names=row.names(.)) %>%
     arrange(names) %>%
     t() %>%
     as.data.frame()
-
-  new_row <- c(year_start_test = year_start_test, month_start_test=month_start_test, cf$overall, as.character(unlist(feature_importance_row["Overall", ]))) 
+  
+  new_row <- c(year_start_test = year_start_test, month_start_test=month_start_test, cf$overall, cf$byClass, as.character(unlist(feature_importance_row["Overall", ]))) 
   results_df <- rbind(results_df, new_row)
-  colnames(results_df) <- c("year_start_test", "month_start_test", names(cf$overall), colnames(feature_importance_row))
+  colnames(results_df) <- c("year_start_test", "month_start_test", names(cf$overall), names(cf$byClass), colnames(feature_importance_row))
   return(results_df)
 }
 ```
 
 ```{r}
-#evaluate_model()
-```
-
-```{r}
 #for (i in seq(1, nrow(year_month_pairs) - 1)) {
-for (i in seq(1, 30)) {
+for (i in seq(2, 5)) {
   year_start_train <- year_month_pairs$departure_scheduled_year_local[[i]]
   year_start_test <- year_month_pairs$departure_scheduled_year_local[[i+1]]
   month_start_train <- year_month_pairs$departure_scheduled_month_local[[i]]
   month_start_test <- year_month_pairs$departure_scheduled_month_local[[i+1]]
   
+  # Filter flight data for a two months, one for each training and testing
   train_df <- dataset %>%
     filter(departure_scheduled_year_local == year_start_train & departure_scheduled_month_local == month_start_train)
   test_df <- dataset %>%
     filter(departure_scheduled_year_local == year_start_test & departure_scheduled_month_local == month_start_test)
+
   
   # Add Labels
   train_df$delay_departure_min_category <- cut(train_df$delay_departure_min, 
@@ -213,16 +212,24 @@ for (i in seq(1, 30)) {
                                              labels = category_names_quantiles,
                                              include.lowest = TRUE) 
   
-  # Replace NA with average temeperature
+  # Replace NA with average temperature
   average_temperature_train <- mean(train_df$temperature_celsius, na.rm = TRUE)
   average_temperature_test <- mean(test_df$temperature_celsius, na.rm = TRUE)
   train_df$temperature_celsius <- ifelse(is.na(train_df$temperature_celsius), average_temperature_train, train_df$temperature_celsius)
   test_df$temperature_celsius <- ifelse(is.na(test_df$temperature_celsius), average_temperature_test, test_df$temperature_celsius)
   
-  model <- train_model()
+  # Train Model
+  model <- train_model(model_name="svmRadial")
+  
+  # Save new results
   results_df <- evaluate_model()
 }
 ```
+
+```{r}
+colSums(is.na(train_df))
+```
+
 
 ```{r}
 write.csv(results_df, "results_rf.csv")
