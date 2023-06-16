@@ -32,12 +32,12 @@ evaluation_results
 metrics_df <- evaluation_results[, 4:21]
 
 metrics <- data.frame(
-  Mean = apply(metrics_df, 2, mean),
-  Median = apply(metrics_df, 2, median),
-  Min = apply(metrics_df, 2, min),
-  Max = apply(metrics_df, 2, max),
-  Q1 = apply(metrics_df, 2, quantile, probs = 0.25),
-  Q3 = apply(metrics_df, 2, quantile, probs = 0.75)
+  Mean = apply(metrics_df, 2, mean, na.rm = TRUE),
+  Median = apply(metrics_df, 2, median, na.rm = TRUE),
+  Min = apply(metrics_df, 2, min, na.rm = TRUE),
+  Max = apply(metrics_df, 2, max, na.rm = TRUE),
+  Q1 = apply(metrics_df, 2, quantile, probs = 0.25, na.rm = TRUE),
+  Q3 = apply(metrics_df, 2, quantile, probs = 0.75, na.rm = TRUE)
 )
 
 row.names(metrics) <- colnames(metrics_df)

@@ -149,7 +149,7 @@ category_quantiles
 train_model <- function (model_name="svmLinear") {
   ctrl <- trainControl(verboseIter = TRUE, method="none")
   filtered_train_df <- train_df[-(which(names(train_df) %in% c("departure_scheduled_datetime_local", "delay_departure_min")))]
-  filtered_train_df$delay_departure_min_category <- as.character(filtered_train_df$delay_departure_min_category)
+  #filtered_train_df$delay_departure_min_category <- as.character(filtered_train_df$delay_departure_min_category)
 
   model <- train(delay_departure_min_category ~ .,
          data = filtered_train_df,
@@ -160,6 +160,14 @@ train_model <- function (model_name="svmLinear") {
   return(model)
 }
 ```
+
+```{r}
+#model <- train_model()
+#varImp(model)
+#res <- evaluate_model()
+#res
+```
+
 
 ```{r}
 results_df <- data.frame()
@@ -173,13 +181,13 @@ evaluate_model <- function () {
   cf <- confusionMatrix(predictions, filtered_test_df$delay_departure_min_category)
   feature_importance <- varImp(model)#, scale=TRUE)
   
-  feature_importance_row <- feature_importance$importance %>% 
+  feature_importance_row <- feature_importance$importance%>% 
     mutate(names=row.names(.)) %>%
     arrange(names) %>%
     t() %>%
     as.data.frame()
   
-  new_row <- c(year_start_test = year_start_test, month_start_test=month_start_test, cf$overall, cf$byClass, as.character(unlist(feature_importance_row["Overall", ]))) 
+  new_row <- c(year_start_test = year_start_test, month_start_test=month_start_test, cf$overall, cf$byClass, as.character(unlist(feature_importance_row[1, ]))) 
   results_df <- rbind(results_df, new_row)
   colnames(results_df) <- c("year_start_test", "month_start_test", names(cf$overall), names(cf$byClass), colnames(feature_importance_row))
   return(results_df)
@@ -187,8 +195,7 @@ evaluate_model <- function () {
 ```
 
 ```{r}
-#for (i in seq(1, nrow(year_month_pairs) - 1)) {
-for (i in seq(2, 5)) {
+for (i in seq(1, nrow(year_month_pairs) - 1)) {
   year_start_train <- year_month_pairs$departure_scheduled_year_local[[i]]
   year_start_test <- year_month_pairs$departure_scheduled_year_local[[i+1]]
   month_start_train <- year_month_pairs$departure_scheduled_month_local[[i]]
@@ -226,11 +233,9 @@ for (i in seq(2, 5)) {
 }
 ```
 
-```{r}
-colSums(is.na(train_df))
-```
 
 
 ```{r}
 write.csv(results_df, "results_rf.csv")
+results_df
 ```
