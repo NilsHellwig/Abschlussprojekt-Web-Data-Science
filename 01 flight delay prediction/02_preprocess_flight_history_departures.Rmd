@@ -5,6 +5,10 @@ date: "5/16/2023"
 output: html_document
 ---
 
+# Notebook: Create Dataset with Departures
+
+This notebook is used to collate the downloaded .html files to assemble them into a neatly formatted dataframe. This script takes about an hour to run (at least that was the case with my M1 Macbook). 
+
 ## Load Packages
 
 ```{r}
@@ -19,14 +23,16 @@ library(lubridate)
 ## Define Settings
 
 ```{r}
-folder_path_departures <- "datasets/raw_departures_dataset"
+folder_path_departures <- "../datasets/raw_departures_dataset"
 ```
 
-## Preprocessing of departure flights
+## Code
+
+### Load HTML-files
 
 ```{r}
 # Load the filepaths of all the .html-documents
-html_documents <- list.files(path = folder_path_departures, pattern = "\\.html$", full.names = TRUE)
+html_documents <- list.files(path = folder_path_departures, pattern = "\\.html$", full.names = TRUE)[1:2]
 head(html_documents)
 ```
 
@@ -54,18 +60,28 @@ departure_data <- data.frame(
 )
 ```
 
+### Store collected data to dataframe departure_data
+
 ```{r}
 # Load each .html-document
 for (i in seq_along(html_documents)) {
   doc_path <- html_documents[i]
   doc <- read_html(doc_path)
   
+  # The flight data for the flights are located within the <tbody> element. Each flight is 
+  # within a <tr> element that has either the class bg-gray-50 or bg-white. 
+  # The class was added as a condition, because there can be other <tr> elements within the <tbody> element, but they do not contain flight data.
   extracted_data <- doc %>%
     html_nodes("tbody tr.bg-gray-50, tbody tr.bg-white")
   
   for (flight_element in extracted_data) {
-      # let's start by storing all child elements of a flight's flight_element 
-      child_elements_txt <- flight_element %>%
+      # Let's start by storing all innerHTML of the child elements of a flight's flight_element.
+      # In each child element there is metadata about a flight. I hoped that each child element would have an id/class with 
+      # which to extract the corresponding metadata, but unfortunately this was not the case. However, I noticed that 
+      # the index or the order of the child_elements is sufficient to know which child element contains which information. 
+      # For example, child_elements[2] always contains the airline code and airline name for each flight. airline code 
+      # and airline name then only have to be extracted using regular expressions.
+      child_elements <- flight_element %>%
         html_children() %>%
         html_text() %>%
         trimws() # remove whitespaces
@@ -73,8 +89,8 @@ for (i in seq_along(html_documents)) {
       flag_imgs <- flight_element %>%
          html_nodes("img[alt*='Flag for']")
 
-      # It happens that the airline can not be assigned to a country so that there's no flag icon.
-      # Example: Flight to Liege (Belgium), see here: https://www.flightera.net/en/airport/Munich/EDDM/departure/2017-12-13%2022_00?
+      # It happens that an airline can not be assigned to a country so that there's no flag icon.
+      # Example: Flight to Liege (Belgium), ATRAN-Aviatrans Cargo Airlines, see here: https://www.flightera.net/en/airport/Munich/EDDM/departure/2017-12-13%2022_00?
       if (length(flag_imgs) == 1) {
          airline_country <- NULL
          destination_country <- str_extract(html_attr(flag_imgs[1], "alt"), "(?<=Flag for ).*")
@@ -83,11 +99,11 @@ for (i in seq_along(html_documents)) {
          destination_country <- str_extract(html_attr(flag_imgs[2], "alt"), "(?<=Flag for ).*")
       }
      
-      # There are either one or two flight numbers. The flight number is located before the first two \n\n inside child_elements_txt[2]
-      flight_number <- gsub("\\n\\n.*", "", child_elements_txt[2])
+      # There are either one or two flight numbers. The flight number is located before the first two \n\n inside child_elements[2]
+      flight_number <- gsub("\\n\\n.*", "", child_elements[2])
       flight_number <- str_extract_all(flight_number, "[A-Z\\d]+")
       
-      airline <- strsplit(child_elements_txt[2], "\n")[[1]]
+      airline <- strsplit(child_elements[2], "\n")[[1]]
       airline <- tail(airline, n = 1)
     
       airline <- strsplit(airline, "/")[[1]]
@@ -95,38 +111,38 @@ for (i in seq_along(html_documents)) {
       airline_code_IATA <- airline[2]
       airline_name <- sub("\\s\\S+$", "", airline)[1]
       
-      
-      departure_scheduled_date_local <- convert_date_string(strsplit(child_elements_txt[1], "\n")[[1]][1])
-      flight_status <- tail(gsub("\\s+", "",strsplit(child_elements_txt[1], "\n")[[1]]), n = 1)
+      departure_scheduled_date_local <- convert_date_string(strsplit(child_elements[1], "\n")[[1]][1])
+      flight_status <- tail(gsub("\\s+", "",strsplit(child_elements[1], "\n")[[1]]), n = 1)
  
-           
       # Although we know that the local timezone of munich is CEST, I decided to extract that data too because 
       # one might want to use the script for another airport
       if (year(as.Date(departure_scheduled_date_local))==2023) {
-        departure_scheduled_time_local <- strsplit(child_elements_txt[1], "\n")[[1]][7]
-        departure_scheduled_time_local_timezone <- strsplit(child_elements_txt[1], "\n")[[1]][8]
+        departure_scheduled_time_local <- strsplit(child_elements[1], "\n")[[1]][7]
+        departure_scheduled_time_local_timezone <- strsplit(child_elements[1], "\n")[[1]][8]
       } else {
-        departure_scheduled_time_local <- strsplit(child_elements_txt[1], "\n")[[1]][8]
-        departure_scheduled_time_local_timezone <- strsplit(child_elements_txt[1], "\n")[[1]][9]
+        departure_scheduled_time_local <- strsplit(child_elements[1], "\n")[[1]][8]
+        departure_scheduled_time_local_timezone <- strsplit(child_elements[1], "\n")[[1]][9]
       }
 
       departure_scheduled_datetime_local <- paste(departure_scheduled_date_local, departure_scheduled_time_local)
       departure_scheduled_datetime_utc <- format(with_tz(ymd_hm(departure_scheduled_datetime_local, tz = "CEST"), "UTC"), "%Y-%m-%d %H:%M")
      
-      destination_name <- sub(" \\(.*", "", child_elements_txt[3])
+      destination_name <- sub(" \\(.*", "", child_elements[3])
       
       # str_match returns the second column of these matrices
-      flight_code_IATA <- str_match(child_elements_txt[3], "\\(([A-Z]{3}) /")[, 2]
-      flight_code_ICAO <- str_match(child_elements_txt[3], " / ([A-Z]{4})\\)")[, 2]
+      flight_code_IATA <- str_match(child_elements[3], "\\(([A-Z]{3}) /")[, 2]
+      flight_code_ICAO <- str_match(child_elements[3], " / ([A-Z]{4})\\)")[, 2]
       
+      # Information about the delay is only available if the flight has landed and has not been cancelled or for the case that the status is unknown.
       if (flight_status == "Landed") {
-        delay_departure_split <- strsplit(child_elements_txt[5], "\n")[[1]]
+        delay_departure_split <- strsplit(child_elements[5], "\n")[[1]]
+        # extract_minutes_from_delay_string() extracts the number of minutes from a string like "23min late" or "1h 15min late"
         delay_departure_min <- extract_minutes_from_delay_string(delay_departure_split)
         departure_actual_datetime_local <- format(ymd_hm(departure_scheduled_datetime_local) + minutes(delay_departure_min), "%Y-%m-%d %H:%M")
-        delay_arrival_split <- strsplit(child_elements_txt[6], "\n")[[1]]
+        delay_arrival_split <- strsplit(child_elements[6], "\n")[[1]]
         delay_arrival_min <- extract_minutes_from_delay_string(delay_arrival_split)
         
-        flight_duration_time_min <- extract_minutes_from_delay_string(child_elements_txt[7])
+        flight_duration_time_min <- extract_minutes_from_delay_string(child_elements[7])
         actual_arrival_datetime_local <- format(ymd_hm(departure_scheduled_datetime_local) + minutes(flight_duration_time_min + delay_departure_min), "%Y-%m-%d %H:%M")
       }
       
@@ -161,11 +177,14 @@ for (i in seq_along(html_documents)) {
 }
 ```
 
-If there are not at least 30 flights available for an hour on flightera.com, more than one randomly selected hour may be crawled, in rare cases duplicates may occur. This is because if there are less than 30 flights available, the flights for the hours after the randomly selected hour are returned - to get 30 flights in each case.
+### Further Preprocessing of the dataset
+
+If there are not at least 30 flights available for an hour on flightera.com, flights for more than the randomly selected hour may be crawled. In rare cases duplicates may occur in case the upcoming hour was also randomly selected.
 
 ```{r}
 duplicate_rows <- departure_data[duplicated(departure_data), ]
 departure_data <- distinct(departure_data)
+head(duplicate_rows)
 ```
 
 ```{r}
@@ -184,10 +203,10 @@ departure_data$departure_scheduled_weekday_local <- factor(weekdays(departure_da
 
 
 ```{r}
-departure_data
+head(departure_data)
 ```
 
 
 ```{r}
-write.csv(departure_data, file = "datasets/departure_dataset.csv", row.names = FALSE)
+write.csv(departure_data, file = "../datasets/departure_dataset.csv", row.names = FALSE)
 ```
