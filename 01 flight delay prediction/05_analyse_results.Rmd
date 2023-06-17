@@ -1,9 +1,6 @@
----
-title: "04_analyse_results"
-author: "Nils Hellwig"
-date: "6/14/2023"
-output: html_document
----
+# Notebook: Analyse Results of Trained Model
+
+## Load Packages
 
 ```{r}
 library(ggplot2)
@@ -11,25 +8,34 @@ library(dplyr)
 library(tidyverse)
 ```
 
+## Define Settings
+
 ```{r}
 top_n <- 7
 model_name <- "rf"
 ```
 
+## Code
+
+### Add Column
+
+In order to better visualize the results of the trained model, I will add a column containing both year and month.
 
 ```{r}
-evaluation_results <- read.csv("results_rf.csv")
+evaluation_results <- read.csv(paste0("results/results_", model_name, ".csv"))
 
 evaluation_results <- evaluation_results %>%
-  mutate(year_month = paste(year_start_test, month_start_test, sep = "-"))
+  mutate(year_month_train = paste(year_start_train, month_start_train, sep = "-"))
 
-evaluation_results
+head(evaluation_results)[, c("year_start_train", "month_start_train", "Accuracy", "airline_nameLufthansa")]
 ```
 
-## Calculate mean of each column
+### Calculate mean of each column
+
+I want to calculate the mean of each metric based on all months for which I trained the model.
 
 ```{r}
-metrics_df <- evaluation_results[, 4:21]
+metrics_df <- evaluation_results[, 6:23]
 
 metrics <- data.frame(
   Mean = apply(metrics_df, 2, mean, na.rm = TRUE),
@@ -44,40 +50,50 @@ row.names(metrics) <- colnames(metrics_df)
 metrics
 ```
 
+###  Get Most Important Features
+
+I want to get the features that have the highest average variable importance
+
 ```{r}
-feature_columns <- evaluation_results[, 22:ncol(evaluation_results)]
+feature_columns <- evaluation_results[, 24:ncol(evaluation_results)]
+head(feature_columns)
+```
+
+```{r}
 column_means <- sapply(feature_columns, mean)
 sorted_means <- sort(column_means, decreasing = TRUE)
 top_n_columns <- names(sorted_means)[1:top_n]
+head(top_n_columns)
 ```
 
 
-```{r}
-selected_feature_timeseries <- evaluation_results %>%
-  select(departure_scheduled_hour_local, year_month)
-selected_feature_timeseries
-```
+### Format Data for Visualisation of the Development of the Feature Importance Over Time
 
 ```{r, fig.width = 10, fig.height= 3}
 selected_feature_timeseries <- evaluation_results %>%
-  select(all_of(top_n_columns), year_month)
+  select(all_of(top_n_columns), year_month_train)
+selected_feature_timeseries <- tidyr::gather(selected_feature_timeseries, key = "feature", value = "importance", -year_month_train)
+selected_feature_timeseries$year_month_train <- as.Date(paste0(selected_feature_timeseries$year_month_train, "-01"))
+head(selected_feature_timeseries)
+```
 
-selected_feature_timeseries <- tidyr::gather(selected_feature_timeseries, key = "feature", value = "importance", -year_month)
-selected_feature_timeseries$year_month <- as.Date(paste0(selected_feature_timeseries$year_month, "-01"))
+### Create Visualisation for each Year
 
-x_labels <- unique(selected_feature_timeseries$year_month)
+To visualise the development of the feature importance over time, I create a dataframe with three columns, one with the month/year of the test data that should be evaluated, the airline and the importance of the feature.
 
-for (year in unique(year(selected_feature_timeseries$year_month))) {
-  year_data <- subset(selected_feature_timeseries, year(selected_feature_timeseries$year_month) == year)
-  plot <- ggplot(year_data, aes(x = year_month, y = importance, color = feature)) +
+```{r}
+x_labels <- unique(selected_feature_timeseries$year_month_train)
+
+for (year in unique(year(selected_feature_timeseries$year_month_train))) {
+  year_data <- subset(selected_feature_timeseries, year(selected_feature_timeseries$year_month_train) == year)
+  plot <- ggplot(year_data, aes(x = year_month_train, y = importance, color = feature)) +
     geom_line() +
     labs(x = "Month", y = "Variable Importance", color = "Feature") +
     scale_x_date(breaks = x_labels, labels = format(x_labels, "%b %Y")) +
     ggtitle(paste("Year", year))
   
-  filename <- paste("plots/", "plot_", model_name, "_", year, ".png", sep = "")
+  filename <- paste0("plots/", "plot_", model_name, "_", year, ".png", sep = "")
   ggsave(filename, plot = plot, width = 20, height = 10, dpi = 300)
-
   print(plot) 
 }
 ```

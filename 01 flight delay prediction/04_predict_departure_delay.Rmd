@@ -196,9 +196,16 @@ evaluate_model <- function (model, test_df) {
     t() %>%
     as.data.frame()
   
-  new_row <- c(year_start_test = year_start_test, month_start_test=month_start_test, cf$overall, cf$byClass, as.character(unlist(feature_importance_row[1, ]))) 
+  new_row <- c(year_start_test = year_start_test, 
+               month_start_test = month_start_test,
+               year_start_train = year_start_train,
+               month_start_train = month_start_train,
+               cf$overall, 
+               cf$byClass, 
+               as.character(unlist(feature_importance_row[1, ]))
+               ) 
   results_df <- rbind(results_df, new_row)
-  colnames(results_df) <- c("year_start_test", "month_start_test", names(cf$overall), names(cf$byClass), colnames(feature_importance_row))
+  colnames(results_df) <- c("year_start_test", "month_start_test", "year_start_train", "month_start_train", names(cf$overall), names(cf$byClass), colnames(feature_importance_row))
   return(results_df)
 }
 ```
@@ -258,6 +265,6 @@ for (i in seq(1, 5)) {
 
 
 ```{r}
-write.csv(results_df, paste("results_", model_name_method, ".csv"))
+write.csv(results_df, paste0("results/results_", model_name_method, ".csv"))
 head(results_df)
 ```
