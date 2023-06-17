@@ -181,26 +181,15 @@ train_model <- function (model_name="rf") {
 }
 ```
 
-```{r}
-#model <- train_model()
-#varImp(model)
-#res <- evaluate_model()
-#res
-```
-
+### Method to evaluate model
 
 ```{r}
-results_df <- data.frame()
-```
-
-```{r}
-evaluate_model <- function () {
-  filtered_test_df <- test_df
-  filtered_test_df$delay_departure_min_category <- droplevels(filtered_test_df$delay_departure_min_category)
-  predictions <- predict(model, newdata = filtered_test_df)
-  cf <- confusionMatrix(predictions, filtered_test_df$delay_departure_min_category)
-  feature_importance <- varImp(model)#, scale=TRUE)
+evaluate_model <- function (model, test_df) {
+  predictions <- predict(model, newdata = test_df)
+  cf <- confusionMatrix(predictions, test_df$delay_departure_min_category)
+  feature_importance <- varImp(model)
   
+  # Now I extract the variable importance from all variables (in alphabetic order)
   feature_importance_row <- feature_importance$importance%>% 
     mutate(names=row.names(.)) %>%
     arrange(names) %>%
@@ -215,9 +204,10 @@ evaluate_model <- function () {
 ```
 
 ```{r}
-departure_data
+results_df <- data.frame()
 ```
 
+### Train/Evaluate Model for each month
 
 ```{r}
 #for (i in seq(1, nrow(year_month_pairs) - 1)) {
@@ -261,7 +251,7 @@ for (i in seq(1, 5)) {
   model <- train_model(model_name=model_name_method)
   
   # Save new results
-  results_df <- evaluate_model()
+  results_df <- evaluate_model(model, test_df)
 }
 ```
 
@@ -269,5 +259,5 @@ for (i in seq(1, 5)) {
 
 ```{r}
 write.csv(results_df, paste("results_", model_name_method, ".csv"))
-results_df
+head(results_df)
 ```
