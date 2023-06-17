@@ -167,8 +167,9 @@ head(weather_data)
 
 ```{r}
 # Add better names for columns
-names(weather_data)[names(weather_data) == 'desc'] <- 'description'
+names(weather_data)[names(weather_data) == 'desc'] <- 'weather_description'
 names(weather_data)[names(weather_data) == 'temp'] <- 'temperature_celsius'
+names(weather_data)[names(weather_data) == 'templow'] <- 'temperature_celsius_low'
 names(weather_data)[names(weather_data) == 'wd'] <- 'wind_direction'
 names(weather_data)[names(weather_data) == 'wind'] <- 'wind_speed_km'
 names(weather_data)[names(weather_data) == 'hum'] <- 'humidity'

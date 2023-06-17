@@ -1,11 +1,8 @@
----
-title: "Predict Departure Delay"
-author: "Nils Hellwig"
-date: "24 5 2023"
-output: html_document
----
+# Notebook: Predict Flight Delay
 
-# Load Packages
+In this notebook, the aim is to predict whether a particular flight has (a) little/no delay or (b) long/very long delay, i.e. a binary classification. Previously, I tried to predict the delay of flights departing between 05/2022 and 05/2023 using the flight data from 10/2017 to 5/2022, also in a binary way. I was able to achieve a very poor accuracy (about 50%). 
+
+## Load Packages
 
 ```{r}
 library(ggplot2)
@@ -13,80 +10,72 @@ library(dplyr)
 library(stringr)
 library(caret)
 library(e1071)
+source("get_weather_data.R")
 ```
 
-# Settings
+## Settings
 
 ```{r}
 set.seed(42)
+model_name_method <- "rf"
 ```
 
-# Load Datasets
+## Load Datasets
 
 First, we need to load the dataset and add some columns that will be used for feature extraction (as already known from the data exploration script).
 
-```{r}
+```{r}  
 # Load departure data
 departure_data <- read.csv("../datasets/departure_dataset.csv")
 weather_data <- read.csv("../datasets/weather_munich_dataset.csv")
-departure_data
+head(departure_data)
 ```
+## Convert to POSIXct
 
 ```{r}
 departure_data$departure_scheduled_datetime_local <- as.POSIXct(departure_data$departure_scheduled_datetime_local)
 weather_data$six_hours_starting_from_datatime <- as.POSIXct(paste(weather_data$date, weather_data$six_hours_starting_from))
 ```
 
-```{r}
-get_weather_data <- function(departure_time) {
-  if (format(departure_time, format = "%Y-%m-%d 06:00:00") > departure_time) {
-    weather_span <- format(departure_time, format = "%Y-%m-%d 00:00:00")
-  } else if (format(departure_time, format = "%Y-%m-%d 12:00:00") > departure_time) {
-    weather_span <- format(departure_time, format = "%Y-%m-%d 06:00:00")
-  } else if (format(departure_time, format = "%Y-%m-%d 18:00:00") > departure_time) {
-    weather_span <- format(departure_time, format = "%Y-%m-%d 12:00:00")
-  } else if (format(departure_time, format = "%Y-%m-%d 24:00:00") > departure_time) {
-    weather_span <- format(departure_time, format = "%Y-%m-%d 18:00:00")
-  } 
-  nearest_row <- weather_data[weather_data$six_hours_starting_from_datatime == weather_span,]
-  return(weather_span)
-}
+## Add Weather Data
 
+```{r}
 departure_data$six_hours_starting_from_datatime <- as.POSIXct(sapply(departure_data$departure_scheduled_datetime_local, get_weather_data))
-```
-
-
-```{r}
-# exclude unnecessary columns that we don't want to add to the departure_data dataframe
 merge_cols_weather_data <- setdiff(names(weather_data), c("date", "six_hours_starting_from"))
-departure_data <- merge(departure_data, weather_data[, c(merge_cols_weather_data)], by.x = "six_hours_starting_from_datatime", by.y = "six_hours_starting_from_datatime", all.x = TRUE)
+departure_data <- merge(departure_data, 
+                        weather_data[, c(merge_cols_weather_data)], 
+                        by.x = "six_hours_starting_from_datatime", 
+                        by.y = "six_hours_starting_from_datatime", 
+                        all.x = TRUE)
 head(departure_data)
 ```
 
+## Remove Special characters from values
+
+
 ```{r}
-# For a better understanding of what data is in this column
-departure_data <- departure_data %>%
-  rename(weather_description = description)
-
-# There are cases where no weather description is given but other weather data such as temperature is available. 
-# In this case, I set a value for these cases so that the value is not NA but such cases get their own column for the one-hot encoding.
-departure_data$weather_description <- ifelse(is.na(departure_data$weather_description), "Notspecified", departure_data$weather_description)
-
 # Since there should be a separate column for each value for weather_description later, which then has its value as the column name, I remove all "." and spaces so that you can access the column name later using $ in R.
 departure_data$weather_description <- gsub("[. ]", "", departure_data$weather_description)
 departure_data$airline_name <- gsub("[. ]", "", departure_data$airline_name)
 departure_data$destination_IATA <- gsub("[. ]", "", departure_data$destination_IATA)
-departure_data
+head(departure_data)
 ```
+
+```{r}
+# There are cases where no weather description is given but other weather data such as temperature is available. 
+# In this case, I set a value for these cases to "NotSpecified" so that the value is not NA. Later, such cases get their own column for the one-hot encoding that will be applied.
+departure_data$weather_description <- ifelse(is.na(departure_data$weather_description), "NotSpecified", departure_data$weather_description)
+```
+
+## Select Flights
 
 As I want to predict the amount of delay, I will only look at flights that have landed
 
 ```{r}
 departure_data <- departure_data[departure_data$flight_status == "Landed", ]
-departure_data
 ```
 
-# ------ Feature Coding --------
+## Feature Coding
 
 ```{r}
 dataset <- departure_data %>%
@@ -96,14 +85,18 @@ dataset <- departure_data %>%
          departure_scheduled_hour_local, # continuous variable
          departure_scheduled_month_local, # continuous variable 
          departure_scheduled_year_local, # continuous variable
-         temperature_celsius)
+         temperature_celsius,
+         temperature_celsius_low,
+         baro,
+         wind_speed_km,
+         wind_direction,
+         humidity)
 ```
 
 ```{r}
 dataset$departure_scheduled_weekday_local <- as.integer(factor(dataset$departure_scheduled_weekday_local,
                                                                       levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"),
                                                                       labels = 1:7))
-dataset
 ```
 
 ```{r}
@@ -112,10 +105,26 @@ dataset
 dataset <- cbind(dataset, apply(model.matrix(~ weather_description - 1, data = departure_data), 2, as.integer)) 
 dataset <- cbind(dataset, apply(model.matrix(~ airline_name - 1, data = departure_data), 2, as.integer))
 dataset <- cbind(dataset, apply(model.matrix(~ destination_IATA - 1, data = departure_data), 2, as.integer))
-dataset
 ```
 
-Remove Outliers
+```{r}
+# Now there are one hot encoded columns
+head(dataset[, c("weather_descriptionMostlycloudy", "weather_descriptionMorecloudsthansun", "weather_descriptionMild")])
+```
+
+## Remove Outliers
+
+There are extreme outliers in the data set. I have no explanation for this, probably some technical problems...
+
+```{r}
+head(dataset[order(dataset$delay_departure_min, decreasing = TRUE), ], 5)[, c("delay_departure_min", "departure_scheduled_datetime_local")]
+```
+
+```{r}
+head(dataset[order(dataset$delay_departure_min), ], 5)[, c("delay_departure_min", "departure_scheduled_datetime_local")]
+```
+
+In order to remove the outliers, the code calculates the z-scores for the "delay_departure_min" column in the dataset using the scale() function. The z-score measures how many standard deviations an observation is away from the mean.
 
 ```{r}
 z_scores <- scale(dataset$delay_departure_min)
@@ -124,9 +133,7 @@ outliers_train_df <- abs(z_scores) > z_threshold
 dataset <- dataset[!outliers_train_df, ]
 ```
 
-```{r}
-dataset[order(dataset$departure_scheduled_datetime_local), ]
-```
+## --> Remove Later
 
 ```{r}
 dataset <- dataset %>%
@@ -134,16 +141,19 @@ dataset <- dataset %>%
   filter(!(departure_scheduled_year_local == 2023 & departure_scheduled_month_local == 5))
 ```
 
+## Prepare List of Year and Months
+
+The model should always be trained with flight data from one month and evaluated with flight data from the following month.
 
 ```{r}
 year_month_pairs <- dataset %>%
   group_by(departure_scheduled_month_local, departure_scheduled_year_local) %>%
   summarise(average_delay = mean(delay_departure_min)) %>%
   arrange(departure_scheduled_year_local, departure_scheduled_month_local)
-year_month_pairs
+head(year_month_pairs)
 ```
 
-Define Classes
+## Define Classes
 
 ```{r}
 category_names_quantiles <- c("earlier, on time or very short delay", "long delay")
@@ -151,14 +161,16 @@ category_quantiles <- quantile(dataset$delay_departure_min, probs = c(0.0, 0.5, 
 category_quantiles
 ```
 
-# ------ Split Dataset to train/test --------
+
+## Train Model
+
+### Method to train model
 
 ```{r}
-train_model <- function (model_name="svmLinear") {
+train_model <- function (model_name="rf") {
   ctrl <- trainControl(verboseIter = TRUE, method="none")
   filtered_train_df <- train_df[-(which(names(train_df) %in% c("departure_scheduled_datetime_local", "delay_departure_min")))]
-  #filtered_train_df$delay_departure_min_category <- as.character(filtered_train_df$delay_departure_min_category)
-
+  
   model <- train(delay_departure_min_category ~ .,
          data = filtered_train_df,
          method = model_name,
@@ -203,7 +215,13 @@ evaluate_model <- function () {
 ```
 
 ```{r}
-for (i in seq(1, nrow(year_month_pairs) - 1)) {
+departure_data
+```
+
+
+```{r}
+#for (i in seq(1, nrow(year_month_pairs) - 1)) {
+for (i in seq(1, 5)) {
   year_start_train <- year_month_pairs$departure_scheduled_year_local[[i]]
   year_start_test <- year_month_pairs$departure_scheduled_year_local[[i+1]]
   month_start_train <- year_month_pairs$departure_scheduled_month_local[[i]]
@@ -227,14 +245,20 @@ for (i in seq(1, nrow(year_month_pairs) - 1)) {
                                              labels = category_names_quantiles,
                                              include.lowest = TRUE) 
   
-  # Replace NA with average temperature
-  average_temperature_train <- mean(train_df$temperature_celsius, na.rm = TRUE)
-  average_temperature_test <- mean(test_df$temperature_celsius, na.rm = TRUE)
-  train_df$temperature_celsius <- ifelse(is.na(train_df$temperature_celsius), average_temperature_train, train_df$temperature_celsius)
-  test_df$temperature_celsius <- ifelse(is.na(test_df$temperature_celsius), average_temperature_test, test_df$temperature_celsius)
+  # Replace NA with average
+  columns <- c("temperature_celsius", "temperature_celsius_low", "baro", "wind_speed_km", "wind_direction", "humidity")
+
+  for (col in columns) {
+     average_value_train <- mean(train_df[[col]], na.rm = TRUE)
+     average_value_test <- mean(test_df[[col]], na.rm = TRUE)
+  
+     train_df[[col]] <- ifelse(is.na(train_df[[col]]), average_value_train, train_df[[col]])
+     test_df[[col]] <- ifelse(is.na(test_df[[col]]), average_value_test, test_df[[col]])
+  }
+
   
   # Train Model
-  model <- train_model(model_name="svmRadial")
+  model <- train_model(model_name=model_name_method)
   
   # Save new results
   results_df <- evaluate_model()
@@ -244,6 +268,6 @@ for (i in seq(1, nrow(year_month_pairs) - 1)) {
 
 
 ```{r}
-write.csv(results_df, "results_rf.csv")
+write.csv(results_df, paste("results_", model_name_method, ".csv"))
 results_df
 ```

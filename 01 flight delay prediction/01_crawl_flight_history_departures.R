@@ -9,7 +9,7 @@ library(rvest)
 base_url_departures <- "https://www.flightera.net/en/airport/Munich/EDDM/departure/"
 
 # These are the days that are available on Flightera.net for both departures and arrivals
-days_for_crawling <- as.character(seq(as.Date("2017-10-01"), as.Date("2023-05-31"), by = "day"))
+days_for_crawling <- as.character(seq(as.Date("2020-05-31"), as.Date("2023-05-31"), by = "day"))
 
 n_hours_to_crawl = 4
 
@@ -17,8 +17,8 @@ n_hours_to_crawl = 4
 # I also make sure that there is always a waiting time of at least 45 minutes
 # between these 99 requests. 
 requests_per_pause <- 99
-pause_per_request <- 7
-pause_duration <- 2701
+pause_per_request <- 8
+pause_duration <- 2800
 
 n_requests <- 0
 
