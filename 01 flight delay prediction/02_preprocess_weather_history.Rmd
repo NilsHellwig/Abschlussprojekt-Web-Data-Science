@@ -1,9 +1,6 @@
----
-title: "02 Preprocess Weather History"
-author: "Nils Hellwig"
-date: "5/16/2023"
-output: html_document
----
+# Notebook: Create Dataframe with Weather data
+
+This notebook is used to compile the weather data downloaded as .html files into a dataframe. This is a particular challenge because the weather data in a .html file is inside a `<script/>` tag. The data is stored in a JavaScript object.
 
 ## Load Packages
 
@@ -18,10 +15,12 @@ library(jsonlite)
 ## Define Settings
 
 ```{r}
-folder_path_weather_munich <- "datasets/raw_weather_munich_dataset"
+folder_path_weather_munich <- "../datasets/raw_weather_munich_dataset"
 ```
 
-## Preprocessing of departure flights
+## Code
+
+### Preprocessing of departure flights
 
 ```{r}
 # Load the filepaths of all the .html-documents
@@ -29,7 +28,7 @@ html_documents <- list.files(path = folder_path_weather_munich, pattern = "\\.ht
 head(html_documents)
 ```
 
-## Init empty dataframe to store weather data
+### Init empty dataframe to store weather data
 
 ```{r}
 weather_data <- data.frame(
@@ -45,13 +44,44 @@ weather_data <- data.frame(
 )
 ```
 
-## Iterate through all html-documents and store data to .html-file
+### Iterate through all html-documents and store data to .html-file
+
+The weather data is always in the second `<script>`-element within the element of class headline-banner__wrap. It looks like this:
+
+```
+<script type="text/javascript">
+      var data = { 
+           ...
+           detail: [
+               {
+                      hl: true,
+                      hls: "Fr, 1. Dez",
+                      hlsh: "1. Dez",
+                      date: 1512108e6,
+                      ts: "06:00",
+                      ds: "Freitag, 1. Dezember 2017, 06:00 — 12:00",
+                      icon: 6,
+                      desc: "Partly sunny.",
+                      temp: 0,
+                      templow: -6,
+                      baro: 1010,
+                      wind: 5,
+                      wd: 250,
+                      hum: 95,
+                }, ...
+           ],
+           ...
+      }
+<script/>
+````
+
+There is always weather data for the time between 00:00-6:00, 6:00-12:00, 12:00-18:00 and 18:00-24:00.
 
 ```{r}
 for (html_path in html_documents) {
   html <- read_html(html_path)
+  script_tag_inner <- html %>% html_nodes(".headline-banner__wrap script:nth-child(2)") %>% html_text()
   
-  script_tag_inner <- html %>% html_nodes("section.headline-banner__wrap script:nth-child(2)") %>% html_text()
   # This expression is used to select the inner of the script tag. The weather data is stored in a JavaScript variable inside a <script>-tag
   script_tag_inner <- gsub(".*detail(.+)\\]", "\\1", script_tag_inner)
   script_tag_inner <- gsub("\n", "", script_tag_inner)
@@ -73,7 +103,9 @@ for (html_path in html_documents) {
     )
     
     matches <- str_extract_all(weather_data_string, "'(ds|desc)':('([^']*)')")
-
+    
+    # First, extract the textual data that is relevant for me. 
+    # This is the description (for example "Partly sunny.") and ds (date string, for example "Freitag, 1. Dezember 2017, 06:00 — 12:00")
     for (match in matches[[1]]) {
       key <- str_extract(match, "ds|desc")
       value <- str_extract(match, "(:'([^']*)')")
@@ -83,11 +115,13 @@ for (html_path in html_documents) {
       value <- str_replace(value, "'$", "")
       weather_row[[key]] <- value
     }
-    # somethimes, there are objects listed without actual weather data for a specific point in time. 
+    # Sometimes, there are objects listed within the detail array without actual weather data for a specific point in time. 
     # for example: "{'offset':0,'scale':1}", which is useless for my purpose.
     # in order to obtain only relevant data, it is checked whether there is the column "ds" or not
     if (any(!is.na(weather_row$ds)) && weather_row["desc"] != "") {
        matches <- str_extract_all(weather_data_string, "'(icon|temp|templow|baro|wind|wd|hum)':-?[0-9]+")
+       # Especially for the time before 2020, there are some periods for which no historical weather data are available.
+       # It does not make sense to extract weather data for this case, as it is not stored in the object.
        if (weather_row$desc != "No weather data available") {
             for (match in matches[[1]]) {
                key <- str_extract(match, "'icon'|'temp'|'templow'|'baro'|'wind'|'wd'|'hum'")
@@ -103,7 +137,7 @@ for (html_path in html_documents) {
 }
 ```
 
-## Further preprocessing
+### Further Preprocessing
 
 ```{r}
 convert_datetime <- function(string) {
@@ -112,24 +146,27 @@ convert_datetime <- function(string) {
 }
 
 weather_data$ds <- sapply(weather_data$ds, convert_datetime)
-weather_data
+head(weather_data)
 ```
 
 ```{r}
-# store  date and time in a separate column
+# Store  date and time in a separate column
 weather_data$ds <- as.POSIXct(weather_data$ds)
 weather_data$date <- format(weather_data$ds, "%Y-%m-%d")
 weather_data$six_hours_starting_from <- format(weather_data$ds, "%H:%M")
 weather_data <- subset(weather_data, select = -ds)
+head(weather_data)
 ```
 
 ```{r}
-# make sure that the dataframe is sorted by date and time
+# Make sure that the dataframe is sorted by date and time
 weather_data <- weather_data %>%
   arrange(date, six_hours_starting_from)
+head(weather_data)
 ```
 
 ```{r}
+# Add better names for columns
 names(weather_data)[names(weather_data) == 'desc'] <- 'description'
 names(weather_data)[names(weather_data) == 'temp'] <- 'temperature_celsius'
 names(weather_data)[names(weather_data) == 'wd'] <- 'wind_direction'
@@ -137,8 +174,9 @@ names(weather_data)[names(weather_data) == 'wind'] <- 'wind_speed_km'
 names(weather_data)[names(weather_data) == 'hum'] <- 'humidity'
 # Id of the weather icon. Example: an entry in weather_data with id=19 can be found here: https://c.tadst.com/gfx/w/svg/wt-19.svg (rain)
 names(weather_data)[names(weather_data) == 'icon'] <- 'weather_icon'
+head(weather_data)
 ```
 
 ```{r}
-write.csv(weather_data, file = "datasets/weather_munich_dataset.csv", row.names = FALSE)
+write.csv(weather_data, file = "../datasets/weather_munich_dataset.csv", row.names = FALSE)
 ```

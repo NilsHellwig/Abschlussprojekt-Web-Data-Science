@@ -53,9 +53,17 @@ get_weather_data <- function(departure_time) {
 }
 
 departure_data$six_hours_starting_from_datatime <- as.POSIXct(sapply(departure_data$departure_scheduled_datetime_local, get_weather_data))
+```
+
+
+```{r}
 # exclude unnecessary columns that we don't want to add to the departure_data dataframe
 merge_cols_weather_data <- setdiff(names(weather_data), c("date", "six_hours_starting_from"))
 departure_data <- merge(departure_data, weather_data[, c(merge_cols_weather_data)], by.x = "six_hours_starting_from_datatime", by.y = "six_hours_starting_from_datatime", all.x = TRUE)
+head(departure_data)
+```
+
+```{r}
 # For a better understanding of what data is in this column
 departure_data <- departure_data %>%
   rename(weather_description = description)

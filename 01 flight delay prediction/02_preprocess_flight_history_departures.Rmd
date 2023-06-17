@@ -1,5 +1,5 @@
 ---
-title: "02 Preprocess Flight History"
+title: "02 Preprocess Flight History Departures"
 author: "Nils Hellwig"
 date: "5/16/2023"
 output: html_document
@@ -7,7 +7,7 @@ output: html_document
 
 # Notebook: Create Dataset with Departures
 
-This notebook is used to collate the downloaded .html files to assemble them into a neatly formatted dataframe. This script takes about an hour to run (at least that was the case with my M1 Macbook). 
+This notebook is used to collate the downloaded .html files for the departure flights to assemble them into a neatly formatted dataframe. This script takes about an hour to run (at least that was the case with my M1 MacBook). This is not due to the use of for loops, this is due to the many regular expressions used to process the many flight data.
 
 ## Load Packages
 

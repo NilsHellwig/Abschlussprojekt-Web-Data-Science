@@ -1,0 +1,504 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+%
+\documentclass[
+]{article}
+\title{02 Preprocess Weather History}
+\author{Nils Hellwig}
+\date{5/16/2023}
+
+\usepackage{amsmath,amssymb}
+\usepackage{lmodern}
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math}
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{xcolor}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\IfFileExists{bookmark.sty}{\usepackage{bookmark}}{\usepackage{hyperref}}
+\hypersetup{
+  pdftitle={02 Preprocess Weather History},
+  pdfauthor={Nils Hellwig},
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+\urlstyle{same} % disable monospaced font for URLs
+\usepackage[margin=1in]{geometry}
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\usepackage{framed}
+\definecolor{shadecolor}{RGB}{248,248,248}
+\newenvironment{Shaded}{\begin{snugshade}}{\end{snugshade}}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{0.94,0.16,0.16}{#1}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.77,0.63,0.00}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\BuiltInTok}[1]{#1}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{0.64,0.00,0.00}{\textbf{#1}}}
+\newcommand{\ExtensionTok}[1]{#1}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\ImportTok}[1]{#1}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{#1}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.81,0.36,0.00}{\textbf{#1}}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\RegionMarkerTok}[1]{#1}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\usepackage{graphicx}
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\def\maxheight{\ifdim\Gin@nat@height>\textheight\textheight\else\Gin@nat@height\fi}
+\makeatother
+% Scale images if necessary, so that they will not overflow the page
+% margins by default, and it is still possible to overwrite the defaults
+% using explicit options in \includegraphics[width, height, ...]{}
+\setkeys{Gin}{width=\maxwidth,height=\maxheight,keepaspectratio}
+% Set default figure placement to htbp
+\makeatletter
+\def\fps@figure{htbp}
+\makeatother
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\ifLuaTeX
+  \usepackage{selnolig}  % disable illegal ligatures
+\fi
+
+\begin{document}
+\maketitle
+
+\hypertarget{notebook-create-dataframe-with-weather-data}{%
+\section{Notebook: Create Dataframe with Weather
+data}\label{notebook-create-dataframe-with-weather-data}}
+
+This notebook is used to compile the weather data downloaded as .html
+files into a dataframe. This is a particular challenge because the
+weather data in a .html file is inside a
+
+tag. The data is stored in a JavaScript object.
+
+\hypertarget{load-packages}{%
+\subsection{Load Packages}\label{load-packages}}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{library}\NormalTok{(rvest)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Warning: Paket 'rvest' wurde unter R Version 4.1.2 erstellt
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{library}\NormalTok{(tidyverse)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Warning: Paket 'tidyverse' wurde unter R Version 4.1.2 erstellt
+\end{verbatim}
+
+\begin{verbatim}
+## Warning: Paket 'ggplot2' wurde unter R Version 4.1.2 erstellt
+\end{verbatim}
+
+\begin{verbatim}
+## Warning: Paket 'tibble' wurde unter R Version 4.1.2 erstellt
+\end{verbatim}
+
+\begin{verbatim}
+## Warning: Paket 'tidyr' wurde unter R Version 4.1.2 erstellt
+\end{verbatim}
+
+\begin{verbatim}
+## Warning: Paket 'readr' wurde unter R Version 4.1.2 erstellt
+\end{verbatim}
+
+\begin{verbatim}
+## Warning: Paket 'purrr' wurde unter R Version 4.1.2 erstellt
+\end{verbatim}
+
+\begin{verbatim}
+## Warning: Paket 'dplyr' wurde unter R Version 4.1.2 erstellt
+\end{verbatim}
+
+\begin{verbatim}
+## Warning: Paket 'stringr' wurde unter R Version 4.1.2 erstellt
+\end{verbatim}
+
+\begin{verbatim}
+## Warning: Paket 'forcats' wurde unter R Version 4.1.2 erstellt
+\end{verbatim}
+
+\begin{verbatim}
+## Warning: Paket 'lubridate' wurde unter R Version 4.1.2 erstellt
+\end{verbatim}
+
+\begin{verbatim}
+## -- Attaching core tidyverse packages ------------------------ tidyverse 2.0.0 --
+## v dplyr     1.1.2     v readr     2.1.4
+## v forcats   1.0.0     v stringr   1.5.0
+## v ggplot2   3.4.2     v tibble    3.2.1
+## v lubridate 1.9.2     v tidyr     1.3.0
+## v purrr     1.0.1     
+## -- Conflicts ------------------------------------------ tidyverse_conflicts() --
+## x dplyr::filter()         masks stats::filter()
+## x readr::guess_encoding() masks rvest::guess_encoding()
+## x dplyr::lag()            masks stats::lag()
+## i Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{library}\NormalTok{(stringr)}
+\FunctionTok{library}\NormalTok{(xml2)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Warning: Paket 'xml2' wurde unter R Version 4.1.2 erstellt
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{library}\NormalTok{(jsonlite)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Warning: Paket 'jsonlite' wurde unter R Version 4.1.2 erstellt
+\end{verbatim}
+
+\begin{verbatim}
+## 
+## Attache Paket: 'jsonlite'
+## 
+## Das folgende Objekt ist maskiert 'package:purrr':
+## 
+##     flatten
+\end{verbatim}
+
+\hypertarget{define-settings}{%
+\subsection{Define Settings}\label{define-settings}}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{folder\_path\_weather\_munich }\OtherTok{\textless{}{-}} \StringTok{"../datasets/raw\_weather\_munich\_dataset"}
+\end{Highlighting}
+\end{Shaded}
+
+\hypertarget{code}{%
+\subsection{Code}\label{code}}
+
+\hypertarget{preprocessing-of-departure-flights}{%
+\subsubsection{Preprocessing of departure
+flights}\label{preprocessing-of-departure-flights}}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Load the filepaths of all the .html{-}documents}
+\NormalTok{html\_documents }\OtherTok{\textless{}{-}} \FunctionTok{list.files}\NormalTok{(}\AttributeTok{path =}\NormalTok{ folder\_path\_weather\_munich, }\AttributeTok{pattern =} \StringTok{"}\SpecialCharTok{\textbackslash{}\textbackslash{}}\StringTok{.html$"}\NormalTok{, }\AttributeTok{full.names =} \ConstantTok{TRUE}\NormalTok{)}
+\FunctionTok{head}\NormalTok{(html\_documents)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## [1] "../datasets/raw_weather_munich_dataset/request_2017-10.html"
+## [2] "../datasets/raw_weather_munich_dataset/request_2017-11.html"
+## [3] "../datasets/raw_weather_munich_dataset/request_2017-12.html"
+## [4] "../datasets/raw_weather_munich_dataset/request_2018-01.html"
+## [5] "../datasets/raw_weather_munich_dataset/request_2018-02.html"
+## [6] "../datasets/raw_weather_munich_dataset/request_2018-03.html"
+\end{verbatim}
+
+\hypertarget{init-empty-dataframe-to-store-weather-data}{%
+\subsubsection{Init empty dataframe to store weather
+data}\label{init-empty-dataframe-to-store-weather-data}}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{weather\_data }\OtherTok{\textless{}{-}} \FunctionTok{data.frame}\NormalTok{(}
+  \AttributeTok{ds =} \FunctionTok{character}\NormalTok{(),}
+  \AttributeTok{icon =} \FunctionTok{numeric}\NormalTok{(),}
+  \AttributeTok{desc =} \FunctionTok{character}\NormalTok{(),}
+  \AttributeTok{temp =} \FunctionTok{numeric}\NormalTok{(),}
+  \AttributeTok{templow =} \FunctionTok{numeric}\NormalTok{(),}
+  \AttributeTok{baro =} \FunctionTok{numeric}\NormalTok{(),}
+  \AttributeTok{wind =} \FunctionTok{numeric}\NormalTok{(),}
+  \AttributeTok{wd =} \FunctionTok{numeric}\NormalTok{(),}
+  \AttributeTok{hum =} \FunctionTok{numeric}\NormalTok{()}
+\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\hypertarget{iterate-through-all-html-documents-and-store-data-to-.html-file}{%
+\subsubsection{Iterate through all html-documents and store data to
+.html-file}\label{iterate-through-all-html-documents-and-store-data-to-.html-file}}
+
+The weather data is always in the second
+
+-element within the element of class headline-banner\_\_wrap. It looks
+like this:
+
+\begin{verbatim}
+<script type="text/javascript">
+      var data = { 
+           ...
+           detail: [
+               {
+                      hl: true,
+                      hls: "Fr, 1. Dez",
+                      hlsh: "1. Dez",
+                      date: 1512108e6,
+                      ts: "06:00",
+                      ds: "Freitag, 1. Dezember 2017, 06:00 — 12:00",
+                      icon: 6,
+                      desc: "Partly sunny.",
+                      temp: 0,
+                      templow: -6,
+                      baro: 1010,
+                      wind: 5,
+                      wd: 250,
+                      hum: 95,
+                }, ...
+           ],
+           ...
+      }
+<script/>
+\end{verbatim}
+
+There is always weather data for the time between 00:00-6:00,
+6:00-12:00, 12:00-18:00 and 18:00-24:00.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ControlFlowTok{for}\NormalTok{ (html\_path }\ControlFlowTok{in}\NormalTok{ html\_documents) \{}
+\NormalTok{  html }\OtherTok{\textless{}{-}} \FunctionTok{read\_html}\NormalTok{(html\_path)}
+\NormalTok{  script\_tag\_inner }\OtherTok{\textless{}{-}}\NormalTok{ html }\SpecialCharTok{\%\textgreater{}\%} \FunctionTok{html\_nodes}\NormalTok{(}\StringTok{".headline{-}banner\_\_wrap script:nth{-}child(2)"}\NormalTok{) }\SpecialCharTok{\%\textgreater{}\%} \FunctionTok{html\_text}\NormalTok{()}
+  
+  \CommentTok{\# This expression is used to select the inner of the script tag. The weather data is stored in a JavaScript variable inside a \textless{}script\textgreater{}{-}tag}
+\NormalTok{  script\_tag\_inner }\OtherTok{\textless{}{-}} \FunctionTok{gsub}\NormalTok{(}\StringTok{".*detail(.+)}\SpecialCharTok{\textbackslash{}\textbackslash{}}\StringTok{]"}\NormalTok{, }\StringTok{"}\SpecialCharTok{\textbackslash{}\textbackslash{}}\StringTok{1"}\NormalTok{, script\_tag\_inner)}
+\NormalTok{  script\_tag\_inner }\OtherTok{\textless{}{-}} \FunctionTok{gsub}\NormalTok{(}\StringTok{"}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{, }\StringTok{""}\NormalTok{, script\_tag\_inner)}
+\NormalTok{  script\_tag\_inner }\OtherTok{\textless{}{-}} \FunctionTok{gsub}\NormalTok{(}\StringTok{\textquotesingle{}}\SpecialCharTok{\textbackslash{}\textbackslash{}}\StringTok{"\textquotesingle{}}\NormalTok{, }\StringTok{"\textquotesingle{}"}\NormalTok{, script\_tag\_inner)}
+  
+\NormalTok{  extracted\_strings }\OtherTok{\textless{}{-}} \FunctionTok{str\_extract\_all}\NormalTok{(script\_tag\_inner, }\StringTok{"}\SpecialCharTok{\textbackslash{}\textbackslash{}}\StringTok{\{([\^{}}\SpecialCharTok{\textbackslash{}\textbackslash{}}\StringTok{\{}\SpecialCharTok{\textbackslash{}\textbackslash{}}\StringTok{\}]*)}\SpecialCharTok{\textbackslash{}\textbackslash{}}\StringTok{\}"}\NormalTok{)[[}\DecValTok{1}\NormalTok{]]}
+
+  \ControlFlowTok{for}\NormalTok{ (weather\_data\_string }\ControlFlowTok{in}\NormalTok{ extracted\_strings) \{}
+\NormalTok{    weather\_row }\OtherTok{\textless{}{-}} \FunctionTok{data.frame}\NormalTok{(}
+      \AttributeTok{ds =} \ConstantTok{NA}\NormalTok{,}
+      \AttributeTok{icon =} \ConstantTok{NA}\NormalTok{,}
+      \AttributeTok{desc =} \ConstantTok{NA}\NormalTok{,}
+      \AttributeTok{temp =} \ConstantTok{NA}\NormalTok{,}
+      \AttributeTok{templow =} \ConstantTok{NA}\NormalTok{,}
+      \AttributeTok{baro =} \ConstantTok{NA}\NormalTok{,}
+      \AttributeTok{wind =} \ConstantTok{NA}\NormalTok{,}
+      \AttributeTok{wd =} \ConstantTok{NA}\NormalTok{,}
+      \AttributeTok{hum =} \ConstantTok{NA}
+\NormalTok{    )}
+    
+\NormalTok{    matches }\OtherTok{\textless{}{-}} \FunctionTok{str\_extract\_all}\NormalTok{(weather\_data\_string, }\StringTok{"\textquotesingle{}(ds|desc)\textquotesingle{}:(\textquotesingle{}([\^{}\textquotesingle{}]*)\textquotesingle{})"}\NormalTok{)}
+    
+    \CommentTok{\# First, extract the textual data that is relevant for me. }
+    \CommentTok{\# This is the description (for example "Partly sunny.") and ds (date string, for example "Freitag, 1. Dezember 2017, 06:00 — 12:00")}
+    \ControlFlowTok{for}\NormalTok{ (match }\ControlFlowTok{in}\NormalTok{ matches[[}\DecValTok{1}\NormalTok{]]) \{}
+\NormalTok{      key }\OtherTok{\textless{}{-}} \FunctionTok{str\_extract}\NormalTok{(match, }\StringTok{"ds|desc"}\NormalTok{)}
+\NormalTok{      value }\OtherTok{\textless{}{-}} \FunctionTok{str\_extract}\NormalTok{(match, }\StringTok{"(:\textquotesingle{}([\^{}\textquotesingle{}]*)\textquotesingle{})"}\NormalTok{)}
+      \CommentTok{\# this expression is used to remove the "\textquotesingle{}" at the beginning of a string stored in the JavaScript object as well as the colon before the value}
+\NormalTok{      value }\OtherTok{\textless{}{-}} \FunctionTok{str\_replace}\NormalTok{(value, }\StringTok{":\textquotesingle{}"}\NormalTok{, }\StringTok{""}\NormalTok{)}
+      \CommentTok{\# this expression is used to remove the "\textquotesingle{}"{-}sign at the end of a string stored in the JavaScript object}
+\NormalTok{      value }\OtherTok{\textless{}{-}} \FunctionTok{str\_replace}\NormalTok{(value, }\StringTok{"\textquotesingle{}$"}\NormalTok{, }\StringTok{""}\NormalTok{)}
+\NormalTok{      weather\_row[[key]] }\OtherTok{\textless{}{-}}\NormalTok{ value}
+\NormalTok{    \}}
+    \CommentTok{\# Sometimes, there are objects listed within the detail array without actual weather data for a specific point in time. }
+    \CommentTok{\# for example: "\{\textquotesingle{}offset\textquotesingle{}:0,\textquotesingle{}scale\textquotesingle{}:1\}", which is useless for my purpose.}
+    \CommentTok{\# in order to obtain only relevant data, it is checked whether there is the column "ds" or not}
+    \ControlFlowTok{if}\NormalTok{ (}\FunctionTok{any}\NormalTok{(}\SpecialCharTok{!}\FunctionTok{is.na}\NormalTok{(weather\_row}\SpecialCharTok{$}\NormalTok{ds)) }\SpecialCharTok{\&\&}\NormalTok{ weather\_row[}\StringTok{"desc"}\NormalTok{] }\SpecialCharTok{!=} \StringTok{""}\NormalTok{) \{}
+\NormalTok{       matches }\OtherTok{\textless{}{-}} \FunctionTok{str\_extract\_all}\NormalTok{(weather\_data\_string, }\StringTok{"\textquotesingle{}(icon|temp|templow|baro|wind|wd|hum)\textquotesingle{}:{-}?[0{-}9]+"}\NormalTok{)}
+       \CommentTok{\# Especially for the time before 2020, there are some periods for which no historical weather data are available.}
+       \CommentTok{\# It does not make sense to extract weather data for this case, as it is not stored in the object.}
+       \ControlFlowTok{if}\NormalTok{ (weather\_row}\SpecialCharTok{$}\NormalTok{desc }\SpecialCharTok{!=} \StringTok{"No weather data available"}\NormalTok{) \{}
+            \ControlFlowTok{for}\NormalTok{ (match }\ControlFlowTok{in}\NormalTok{ matches[[}\DecValTok{1}\NormalTok{]]) \{}
+\NormalTok{               key }\OtherTok{\textless{}{-}} \FunctionTok{str\_extract}\NormalTok{(match, }\StringTok{"\textquotesingle{}icon\textquotesingle{}|\textquotesingle{}temp\textquotesingle{}|\textquotesingle{}templow\textquotesingle{}|\textquotesingle{}baro\textquotesingle{}|\textquotesingle{}wind\textquotesingle{}|\textquotesingle{}wd\textquotesingle{}|\textquotesingle{}hum\textquotesingle{}"}\NormalTok{)}
+\NormalTok{               key }\OtherTok{\textless{}{-}} \FunctionTok{str\_replace\_all}\NormalTok{(key, }\StringTok{"\textquotesingle{}"}\NormalTok{, }\StringTok{""}\NormalTok{)}
+\NormalTok{               value }\OtherTok{\textless{}{-}} \FunctionTok{str\_extract}\NormalTok{(match, }\StringTok{"(:{-}?[0{-}9]+)"}\NormalTok{)}
+\NormalTok{               value }\OtherTok{\textless{}{-}} \FunctionTok{str\_replace}\NormalTok{(value, }\StringTok{"}\SpecialCharTok{\textbackslash{}\textbackslash{}}\StringTok{:"}\NormalTok{, }\StringTok{""}\NormalTok{)}
+\NormalTok{               weather\_row[[key]] }\OtherTok{\textless{}{-}}\NormalTok{ value}
+\NormalTok{            \} }
+\NormalTok{       \}}
+\NormalTok{       weather\_data }\OtherTok{\textless{}{-}} \FunctionTok{rbind}\NormalTok{(weather\_data, weather\_row)}
+\NormalTok{    \}}
+\NormalTok{  \}}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+\hypertarget{further-preprocessing}{%
+\subsubsection{Further Preprocessing}\label{further-preprocessing}}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{convert\_datetime }\OtherTok{\textless{}{-}} \ControlFlowTok{function}\NormalTok{(string) \{}
+\NormalTok{  date\_time }\OtherTok{\textless{}{-}} \FunctionTok{strptime}\NormalTok{(string, }\StringTok{"\%A, \%d. \%B \%Y, \%H:\%M"}\NormalTok{)}
+  \FunctionTok{return}\NormalTok{(}\FunctionTok{format}\NormalTok{(date\_time, }\StringTok{"\%Y{-}\%m{-}\%d \%H:\%M:\%S"}\NormalTok{))}
+\NormalTok{\}}
+
+\NormalTok{weather\_data}\SpecialCharTok{$}\NormalTok{ds }\OtherTok{\textless{}{-}} \FunctionTok{sapply}\NormalTok{(weather\_data}\SpecialCharTok{$}\NormalTok{ds, convert\_datetime)}
+\FunctionTok{head}\NormalTok{(weather\_data)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##                    ds icon                      desc temp templow baro wind
+## 1 2017-10-01 06:00:00   18 Light rain. Partly sunny.   10      10 1023    7
+## 2 2017-10-01 12:00:00    6             Partly sunny.   12      12 1023    5
+## 3 2017-10-01 18:00:00 <NA> No weather data available <NA>    <NA> <NA> <NA>
+## 4 2017-10-02 00:00:00 <NA> No weather data available <NA>    <NA> <NA> <NA>
+## 5 2017-10-02 06:00:00    1                    Sunny.   16       5 1021    8
+## 6 2017-10-02 12:00:00    6             Partly sunny.   18      15 1019   15
+##     wd  hum
+## 1  290   94
+## 2    0   80
+## 3 <NA> <NA>
+## 4 <NA> <NA>
+## 5  220   89
+## 6  240   66
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Store  date and time in a separate column}
+\NormalTok{weather\_data}\SpecialCharTok{$}\NormalTok{ds }\OtherTok{\textless{}{-}} \FunctionTok{as.POSIXct}\NormalTok{(weather\_data}\SpecialCharTok{$}\NormalTok{ds)}
+\NormalTok{weather\_data}\SpecialCharTok{$}\NormalTok{date }\OtherTok{\textless{}{-}} \FunctionTok{format}\NormalTok{(weather\_data}\SpecialCharTok{$}\NormalTok{ds, }\StringTok{"\%Y{-}\%m{-}\%d"}\NormalTok{)}
+\NormalTok{weather\_data}\SpecialCharTok{$}\NormalTok{six\_hours\_starting\_from }\OtherTok{\textless{}{-}} \FunctionTok{format}\NormalTok{(weather\_data}\SpecialCharTok{$}\NormalTok{ds, }\StringTok{"\%H:\%M"}\NormalTok{)}
+\NormalTok{weather\_data }\OtherTok{\textless{}{-}} \FunctionTok{subset}\NormalTok{(weather\_data, }\AttributeTok{select =} \SpecialCharTok{{-}}\NormalTok{ds)}
+\FunctionTok{head}\NormalTok{(weather\_data)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##   icon                      desc temp templow baro wind   wd  hum       date
+## 1   18 Light rain. Partly sunny.   10      10 1023    7  290   94 2017-10-01
+## 2    6             Partly sunny.   12      12 1023    5    0   80 2017-10-01
+## 3 <NA> No weather data available <NA>    <NA> <NA> <NA> <NA> <NA> 2017-10-01
+## 4 <NA> No weather data available <NA>    <NA> <NA> <NA> <NA> <NA> 2017-10-02
+## 5    1                    Sunny.   16       5 1021    8  220   89 2017-10-02
+## 6    6             Partly sunny.   18      15 1019   15  240   66 2017-10-02
+##   six_hours_starting_from
+## 1                   06:00
+## 2                   12:00
+## 3                   18:00
+## 4                   00:00
+## 5                   06:00
+## 6                   12:00
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Make sure that the dataframe is sorted by date and time}
+\NormalTok{weather\_data }\OtherTok{\textless{}{-}}\NormalTok{ weather\_data }\SpecialCharTok{\%\textgreater{}\%}
+  \FunctionTok{arrange}\NormalTok{(date, six\_hours\_starting\_from)}
+\FunctionTok{head}\NormalTok{(weather\_data)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##   icon                      desc temp templow baro wind   wd  hum       date
+## 1   18 Light rain. Partly sunny.   10      10 1023    7  290   94 2017-10-01
+## 2    6             Partly sunny.   12      12 1023    5    0   80 2017-10-01
+## 3 <NA> No weather data available <NA>    <NA> <NA> <NA> <NA> <NA> 2017-10-01
+## 4 <NA> No weather data available <NA>    <NA> <NA> <NA> <NA> <NA> 2017-10-02
+## 5    1                    Sunny.   16       5 1021    8  220   89 2017-10-02
+## 6    6             Partly sunny.   18      15 1019   15  240   66 2017-10-02
+##   six_hours_starting_from
+## 1                   06:00
+## 2                   12:00
+## 3                   18:00
+## 4                   00:00
+## 5                   06:00
+## 6                   12:00
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Add better names for columns}
+\FunctionTok{names}\NormalTok{(weather\_data)[}\FunctionTok{names}\NormalTok{(weather\_data) }\SpecialCharTok{==} \StringTok{\textquotesingle{}desc\textquotesingle{}}\NormalTok{] }\OtherTok{\textless{}{-}} \StringTok{\textquotesingle{}description\textquotesingle{}}
+\FunctionTok{names}\NormalTok{(weather\_data)[}\FunctionTok{names}\NormalTok{(weather\_data) }\SpecialCharTok{==} \StringTok{\textquotesingle{}temp\textquotesingle{}}\NormalTok{] }\OtherTok{\textless{}{-}} \StringTok{\textquotesingle{}temperature\_celsius\textquotesingle{}}
+\FunctionTok{names}\NormalTok{(weather\_data)[}\FunctionTok{names}\NormalTok{(weather\_data) }\SpecialCharTok{==} \StringTok{\textquotesingle{}wd\textquotesingle{}}\NormalTok{] }\OtherTok{\textless{}{-}} \StringTok{\textquotesingle{}wind\_direction\textquotesingle{}}
+\FunctionTok{names}\NormalTok{(weather\_data)[}\FunctionTok{names}\NormalTok{(weather\_data) }\SpecialCharTok{==} \StringTok{\textquotesingle{}wind\textquotesingle{}}\NormalTok{] }\OtherTok{\textless{}{-}} \StringTok{\textquotesingle{}wind\_speed\_km\textquotesingle{}}
+\FunctionTok{names}\NormalTok{(weather\_data)[}\FunctionTok{names}\NormalTok{(weather\_data) }\SpecialCharTok{==} \StringTok{\textquotesingle{}hum\textquotesingle{}}\NormalTok{] }\OtherTok{\textless{}{-}} \StringTok{\textquotesingle{}humidity\textquotesingle{}}
+\CommentTok{\# Id of the weather icon. Example: an entry in weather\_data with id=19 can be found here: https://c.tadst.com/gfx/w/svg/wt{-}19.svg (rain)}
+\FunctionTok{names}\NormalTok{(weather\_data)[}\FunctionTok{names}\NormalTok{(weather\_data) }\SpecialCharTok{==} \StringTok{\textquotesingle{}icon\textquotesingle{}}\NormalTok{] }\OtherTok{\textless{}{-}} \StringTok{\textquotesingle{}weather\_icon\textquotesingle{}}
+\FunctionTok{head}\NormalTok{(weather\_data)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##   weather_icon               description temperature_celsius templow baro
+## 1           18 Light rain. Partly sunny.                  10      10 1023
+## 2            6             Partly sunny.                  12      12 1023
+## 3         <NA> No weather data available                <NA>    <NA> <NA>
+## 4         <NA> No weather data available                <NA>    <NA> <NA>
+## 5            1                    Sunny.                  16       5 1021
+## 6            6             Partly sunny.                  18      15 1019
+##   wind_speed_km wind_direction humidity       date six_hours_starting_from
+## 1             7            290       94 2017-10-01                   06:00
+## 2             5              0       80 2017-10-01                   12:00
+## 3          <NA>           <NA>     <NA> 2017-10-01                   18:00
+## 4          <NA>           <NA>     <NA> 2017-10-02                   00:00
+## 5             8            220       89 2017-10-02                   06:00
+## 6            15            240       66 2017-10-02                   12:00
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{write.csv}\NormalTok{(weather\_data, }\AttributeTok{file =} \StringTok{"../datasets/weather\_munich\_dataset.csv"}\NormalTok{, }\AttributeTok{row.names =} \ConstantTok{FALSE}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+
+\end{document}
