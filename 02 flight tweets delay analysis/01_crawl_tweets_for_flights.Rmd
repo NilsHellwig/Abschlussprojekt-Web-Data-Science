@@ -1,11 +1,12 @@
----
-title: "01_crawl_tweets_for_flights"
-author: "Nils Hellwig"
-date: "6/6/2023"
-output:
-  pdf_document: default
-  html_document: default
----
+# Notebook: Collect Tweets Mentioning Flights
+
+This notebook is used to collect tweets in which flights (respectively their flight number) are mentioned. Since the current Twitter API v2 is very expensive, I have been looking for a tool that allows me to collect tweets on a large scale without an API key from Twitter and without major limitations. In the process, I came across Snscrape.
+
+Snscrape: https://github.com/JustAnotherArchivist/snscrape 
+
+Snscrape is a Python-based CLI that allows, among other things, unlimited (no maximum amount of requests, no time limit) crawling of tweets using Twitter search. The usual Twitter search operators can be used. See here: https://developer.twitter.com/en/docs/twitter-api/v1/rules-and-filtering/search-operators.
+
+## Load Packages
 
 ```{r}
 library(reticulate)
@@ -14,7 +15,10 @@ library(dplyr)
 library(tidyr)
 ```
 
-Select Python Environment
+## Settings
+
+### Install Snscrape
+Due to the fact that this is a Python-based tool, it is necessary to install it using Python.
 
 ```{r}
 use_condaenv("/opt/conda")
@@ -24,25 +28,18 @@ use_condaenv("/opt/conda")
 system("pip install snscrape", intern=TRUE)
 ```
 
-First, we can load all the departures
+## Load Dataset
+
+The flight numbers that occur in the main data set are to be considered, whereby only tweets from the period for which I have also collected tweets are to be collected.
 
 ```{r}
 departure_data <- read.csv("datasets/departure_dataset.csv")
-departure_data
 ```
-
-```{r}
-departure_data$destination_name[departure_data$flight_number == "LH2304"][1]
-```
-
-
-I only need to collect the tweets with the lowest date
 
 ```{r}
 lowest_date <- format(min(as.Date(departure_data$departure_scheduled_datetime_local)), "%Y-%m-%d")
 highest_date <- format(max(as.Date(departure_data$departure_scheduled_datetime_local)), "%Y-%m-%d")
 ```
-
 
 Now I can load all the possible values for column $flight_number to collect all tweets for each flight number
 
@@ -50,33 +47,42 @@ Now I can load all the possible values for column $flight_number to collect all 
 flight_numbers <- unique(departure_data$flight_number)
 ```
 
+## Collect Tweets
+
+If one were to search exclusively for flight numbers, it often happens that a large proportion of the tweets that appear in the Twitter search are not related to a flight.
+Therefore, I have made some adjustments to the query in order to avoid receiving tweets that are not related to the flight on the one hand and to receive all tweets that are related to the flight on the other hand.
+
+I have adjusted the search term so that the flight number must always be included. In order to additionally ensure that it is a tweet in connection with the flight, there must be at least one term related to the flight (terms separated by an "OR" in the prompt). I have also noticed that there are some Twitter accounts with thousands of tweets that have a username that is equal to the flight number. Tweets from these users are excluded (with "-from").
+
 ```{r}
-for (flight_name in flight_numbers) {
-  twitter_search_prompt <- paste0('"', flight_name, " (", 
-                                  departure_data$destination_name[departure_data$flight_number == flight_name][1], 
-                                  ") OR (" , departure_data$airline_name[departure_data$flight_number == flight_name][1], 
-                                  ") OR (", departure_data$destination_country[departure_data$flight_number == flight_name][1],
-                                  ") OR (", departure_data$destination_IATA[departure_data$flight_number == flight_name][1], 
+for (flight_number in flight_numbers) {
+  twitter_search_prompt <- paste0('"', flight_number, " (", 
+                                  departure_data$destination_name[departure_data$flight_number == flight_number][1], 
+                                  ") OR (" , departure_data$airline_name[departure_data$flight_number == flight_number][1], 
+                                  ") OR (", departure_data$destination_country[departure_data$flight_number == flight_number][1],
+                                  ") OR (", departure_data$destination_IATA[departure_data$flight_number == flight_number][1], 
                                   ") OR (munich) OR (MUC) OR (airport) OR (airline) OR (aircraft) OR (flight) OR (münchen) OR (flughafen) OR (flug) OR (depart) OR (departed) OR (departing) OR (departure) OR (abflug) OR (abheben) OR (abgehoben) OR (fliege) OR (fliegt) OR (jet) OR (flugzeug) OR (terminal) OR (gate) OR (flugzeit) OR (flight duration) OR (flying) OR (flying time) OR (passagier) OR (passenger) OR (delay) OR (verspätung)",
-                                  " -from:@", flight_name, " since:", lowest_date,  '"')
+                                  " -from:@", flight_number, " since:", lowest_date,  '"')
   
   print(twitter_search_prompt)
 
-  path_save <- paste0("datasets/flight_tweets/tweets_", flight_name, ".json")
+  path_save <- paste0("datasets/flight_tweets/tweets_", flight_number, ".json")
   command <- paste0("snscrape --jsonl --progress --max-results 10000"," twitter-search ", twitter_search_prompt, " > ", path_save)
 
   system(command)
 }
 ```
 
+## Create Dataframe with all Tweets
+
+Snscrape inserts a json object in each line of the file for each individual tweet. No "," is inserted between the JSON-objects 
+by the tool and there are no square brackets around all objects. The .json files are not yet valid, so I have to do this manually.
+
 ```{r}
-# The (Python) package I used to collect the tweets (snscrape) inserts a json object in each line of the file for each individual tweet. 
-# No "," is inserted between the objects by the tool and there are no square brackets around all objects. 
-# The .json files are not yet valid, so I have to do this manually.
 convertToValidJSONString <- function(file_name) {
   file_lines <- readLines(file_name)
 
-  # There were flight numbers for which I could not collect tweets because no tweets were posted about them
+  # There were flight numbers for which I could not collect tweets because no tweets were posted about them. 
   if (length(file_lines) == 0) {
     return (FALSE)
   }
@@ -88,9 +94,9 @@ convertToValidJSONString <- function(file_name) {
   json_string <- paste(c("[", file_lines, "]"), collapse = "")
   return(json_string)
 }
-
 ```
 
+Now I read down all the .json files to compile the most important information of the tweet (username, url, date, content etc.) into a single csv file
 
 ```{r}
 tweets_df <- data.frame()
@@ -111,5 +117,5 @@ tweets_df <- tweets_df %>%
 
 write.csv(tweets_df, file = "datasets/flight_tweets.csv", row.names = FALSE)
 
-tweets_df
+head(tweets_df)
 ```
