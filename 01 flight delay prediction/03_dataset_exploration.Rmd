@@ -185,11 +185,14 @@ The goal will eventually be to predict whether a flight has...
 * no or little delay 
 * a long or very long delay
 
-I decided to split these two groups based on the median
+I decided to split these two groups based on the median. Further notes on the prediction task can also be found in notebook 04.
 
 ```{r}
-quantile(delay_departure_data$delay_departure_min, probs = c(0.0, 0.5, 1.0))
+quantiles <- quantile(delay_departure_data$delay_departure_min, probs = c(0.0, 0.5, 1.0))
+quantiles
 ```
+
+### Distribution of Departure Delay
 
 Among other things, you can see, there are some flights with 0 minutes delay (="on time"):
 
@@ -216,8 +219,25 @@ ggplot(average_delay_destination_departures, aes(x = as.Date(paste(departure_sch
   labs(x = "Month", y = "Average Departure Delay (Minutes)") +
   ggtitle("Average Departure Delay of flights from Munich Airport")
 ```
+As can already be seen in the figure, the average delays were not that high in 2020. Accordingly, the class below the median also occurs rather rarely in 2020 compared to the class that includes examples whose delay_departure_min is above the median. In April 2020, for example, only 5% of the examples belong to this class.
 
-There also seems to be a difference in how much the average delay is depending on the month.
+```{r}
+quartile_50 <- quantile(delay_departure_data$delay_departure_min, probs = 0.5)
+
+delay_departure_data <- delay_departure_data %>%
+  mutate(delay_class = ifelse(delay_departure_min < quartile_50, "earlier, on time or very short delay", "long delay"))
+
+class_counts_each_month_and_year <- delay_departure_data %>%
+  group_by(departure_scheduled_month_year_local) %>%
+  summarise(count_earlier = sum(delay_class == "earlier, on time or very short delay"),
+            count_long = sum(delay_class == "long delay")) %>%
+  mutate(percentage_earlier = count_earlier / (count_earlier + count_long),
+         percentage_long = count_long / (count_earlier + count_long))
+
+class_counts_each_month_and_year
+```
+
+There seems to be a difference in how much the average delay is depending on the month.
 
 ```{r}
 ggplot(delay_departure_data, aes(x = as.factor(departure_scheduled_month_local), y = delay_departure_min)) +

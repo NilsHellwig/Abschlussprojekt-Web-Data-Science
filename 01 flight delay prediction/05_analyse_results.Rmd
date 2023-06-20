@@ -30,6 +30,25 @@ evaluation_results <- evaluation_results %>%
 evaluation_results[, c("year_month_train", "Accuracy")]
 ```
 
+Compared to the other years, the classification accuracy for the months in 2020 is above 80% in most months and thus very high. It should be noted that in 2020, the delay of departure for the flights that took off from Munich were rather less, which is why the lower class (above the median of the overall dataset) was rather rare. See Notebook 03...
+
+```{r, fig.width = 10, fig.height= 3}
+# Date with day is required for visualisation, only year and month can't be transformed into a value of type Date
+evaluation_results$year_month_train_first_day <- as.Date(paste0(evaluation_results$year_month_train, "-01"))
+x_labels_months <- unique(evaluation_results$year_month_train_first_day)
+
+for (year in unique(year(evaluation_results$year_month_train_first_day))) {
+  year_data <- subset(evaluation_results, year(evaluation_results$year_month_train_first_day) == year)
+  plot <- ggplot(year_data, aes(x = year_month_train_first_day, y = Accuracy)) +
+    geom_line() +
+    labs(x = "Month", y = "Variable Accuracy", color = "Feature") +
+    scale_x_date(breaks = x_labels_months, labels = format(x_labels_months, "%b %Y")) +
+    ggtitle(paste("Year", year)) +
+    ylim(0.4, 1)
+  print(plot) 
+}
+```
+
 ### Calculate mean of each column
 
 I want to calculate the mean of each metric based on all months for which I trained the model.
@@ -71,9 +90,8 @@ head(top_n_columns)
 
 ```{r}
 selected_feature_timeseries <- evaluation_results %>%
-  select(all_of(top_n_columns), year_month_train)
-selected_feature_timeseries <- tidyr::gather(selected_feature_timeseries, key = "feature", value = "importance", -year_month_train)
-selected_feature_timeseries$year_month_train <- as.Date(paste0(selected_feature_timeseries$year_month_train, "-01"))
+  select(all_of(top_n_columns), year_month_train_first_day)
+selected_feature_timeseries <- tidyr::gather(selected_feature_timeseries, key = "feature", value = "importance", -year_month_train_first_day)
 head(selected_feature_timeseries)
 ```
 
@@ -82,14 +100,12 @@ head(selected_feature_timeseries)
 To visualise the development of the feature importance over time, I create a dataframe with three columns, one with the month/year of the test data that should be evaluated, the airline and the importance of the feature.
 
 ```{r, fig.width = 10, fig.height= 3}
-x_labels <- unique(selected_feature_timeseries$year_month_train)
-
-for (year in unique(year(selected_feature_timeseries$year_month_train))) {
-  year_data <- subset(selected_feature_timeseries, year(selected_feature_timeseries$year_month_train) == year)
-  plot <- ggplot(year_data, aes(x = year_month_train, y = importance, color = feature)) +
+for (year in unique(year(selected_feature_timeseries$year_month_train_first_day))) {
+  year_data <- subset(selected_feature_timeseries, year(selected_feature_timeseries$year_month_train_first_day) == year)
+  plot <- ggplot(year_data, aes(x = year_month_train_first_day, y = importance, color = feature)) +
     geom_line() +
     labs(x = "Month", y = "Variable Importance", color = "Feature") +
-    scale_x_date(breaks = x_labels, labels = format(x_labels, "%b %Y")) +
+    scale_x_date(breaks = x_labels_months, labels = format(x_labels_months, "%b %Y")) +
     ggtitle(paste("Year", year))
   
   filename <- paste0("plots/", "plot_", model_name, "_", year, ".png", sep = "")

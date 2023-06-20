@@ -1,6 +1,6 @@
 # Notebook: Predict Flight Delay
 
-In this notebook, the aim is to predict whether a particular flight has (a) little/no delay or (b) long/very long delay, i.e. a binary classification. Previously, I tried to predict the delay of flights departing between 05/2022 and 05/2023 using the flight data from 10/2017 to 5/2022, also in a binary way. I was able to achieve a very poor accuracy (about 50%). 
+In this notebook, the aim is to predict whether a particular flight has (a) little/no delay or (b) long/very long delay, i.e. a binary classification. Previously, I tried to predict the delay of flights departing between 05/2022 and 05/2023 using the flight data from 10/2017 to 05/2022, also in a binary way. I was able to achieve a very poor accuracy (about 50%). Previously, the data were divided into five different classes using the 0.2-, 0.4-, 0.6- and 0.8-quantiles.
 
 ## Load Packages
 
