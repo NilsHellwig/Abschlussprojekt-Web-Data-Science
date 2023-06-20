@@ -27,7 +27,7 @@ evaluation_results <- read.csv(paste0("results/results_", model_name, ".csv"))
 evaluation_results <- evaluation_results %>%
   mutate(year_month_train = paste(year_start_train, month_start_train, sep = "-"))
 
-head(evaluation_results)[, c("year_start_train", "month_start_train", "Accuracy", "airline_nameLufthansa")]
+evaluation_results[, c("year_month_train", "Accuracy")]
 ```
 
 ### Calculate mean of each column
@@ -69,7 +69,7 @@ head(top_n_columns)
 
 ### Format Data for Visualisation of the Development of the Feature Importance Over Time
 
-```{r, fig.width = 10, fig.height= 3}
+```{r}
 selected_feature_timeseries <- evaluation_results %>%
   select(all_of(top_n_columns), year_month_train)
 selected_feature_timeseries <- tidyr::gather(selected_feature_timeseries, key = "feature", value = "importance", -year_month_train)
@@ -81,7 +81,7 @@ head(selected_feature_timeseries)
 
 To visualise the development of the feature importance over time, I create a dataframe with three columns, one with the month/year of the test data that should be evaluated, the airline and the importance of the feature.
 
-```{r}
+```{r, fig.width = 10, fig.height= 3}
 x_labels <- unique(selected_feature_timeseries$year_month_train)
 
 for (year in unique(year(selected_feature_timeseries$year_month_train))) {

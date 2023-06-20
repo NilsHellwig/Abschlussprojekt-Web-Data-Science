@@ -7,7 +7,7 @@ output: html_document
 
 # Notebook: Create Dataset with Departures
 
-This notebook is used to collate the downloaded .html files for the departure flights to assemble them into a neatly formatted dataframe. This script takes about an hour to run (at least that was the case with my M1 MacBook). This is not due to the use of for loops, this is due to the many regular expressions used to process the many flight data.
+This notebook is used to preprocess the downloaded .html files of the departure flights to assemble them into a neatly formatted dataframe. This script takes about an hour to run (at least that was the case with my M1 MacBook). This is not due to the use of for loops, this is due to many regular expressions used to extract the flight data.
 
 ## Load Packages
 
@@ -32,7 +32,7 @@ folder_path_departures <- "../datasets/raw_departures_dataset"
 
 ```{r}
 # Load the filepaths of all the .html-documents
-html_documents <- list.files(path = folder_path_departures, pattern = "\\.html$", full.names = TRUE)[1:2]
+html_documents <- list.files(path = folder_path_departures, pattern = "\\.html$", full.names = TRUE)
 head(html_documents)
 ```
 
@@ -199,6 +199,12 @@ departure_data$departure_scheduled_hour_local <- format(departure_data$departure
 Sys.setlocale("LC_TIME", "C")
 weekday_order <- c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 departure_data$departure_scheduled_weekday_local <- factor(weekdays(departure_data$departure_scheduled_datetime_local), levels = weekday_order)
+```
+
+It is possible that flight data outside the period I am looking at is listed on flightera, as sometimes data is returned for more than just the requested hour, as already described.
+
+```{r}
+departure_data <- departure_data[format(departure_data$departure_scheduled_datetime_local, "%Y-%m") >= "2017-10" & format(departure_data$departure_scheduled_datetime_local, "%Y-%m") <= "2023-05", ]
 ```
 
 

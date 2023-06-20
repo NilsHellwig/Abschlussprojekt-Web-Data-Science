@@ -133,14 +133,6 @@ outliers_train_df <- abs(z_scores) > z_threshold
 dataset <- dataset[!outliers_train_df, ]
 ```
 
-## --> Remove Later
-
-```{r}
-dataset <- dataset %>%
-  filter(!(departure_scheduled_year_local == 2017 & departure_scheduled_month_local == 9)) %>%
-  filter(!(departure_scheduled_year_local == 2023 & departure_scheduled_month_local == 5))
-```
-
 ## Prepare List of Year and Months
 
 The model should always be trained with flight data from one month and evaluated with flight data from the following month.
@@ -217,8 +209,7 @@ results_df <- data.frame()
 ### Train/Evaluate Model for each month
 
 ```{r}
-#for (i in seq(1, nrow(year_month_pairs) - 1)) {
-for (i in seq(1, 5)) {
+for (i in seq(1, nrow(year_month_pairs) - 1)) {
   year_start_train <- year_month_pairs$departure_scheduled_year_local[[i]]
   year_start_test <- year_month_pairs$departure_scheduled_year_local[[i+1]]
   month_start_train <- year_month_pairs$departure_scheduled_month_local[[i]]

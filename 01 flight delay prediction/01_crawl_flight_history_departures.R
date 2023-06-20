@@ -9,7 +9,7 @@ library(rvest)
 base_url_departures <- "https://www.flightera.net/en/airport/Munich/EDDM/departure/"
 
 # These are the days that are available on Flightera.net for both departures and arrivals
-days_for_crawling <- as.character(seq(as.Date("2020-05-31"), as.Date("2023-05-31"), by = "day"))
+days_for_crawling <- as.character(seq(as.Date("2017-10-05"), as.Date("2017-10-20"), by = "day"))
 
 n_hours_to_crawl = 4
 

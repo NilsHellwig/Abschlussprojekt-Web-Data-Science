@@ -42,19 +42,6 @@ merge_cols_weather_data <- setdiff(names(weather_data), c("date", "six_hours_sta
 departure_data <- merge(departure_data, weather_data[, c(merge_cols_weather_data)], by.x = "six_hours_starting_from_datatime", by.y = "six_hours_starting_from_datatime", all.x = TRUE)
 head(departure_data)
 ```
-
-```{r}
-#Rename column
-departure_data <- departure_data %>%
-  rename(weather_description = description)
-```
-
-Let's have a look to the data...
-
-```{r}
-head(departure_data)
-```
-
 ### Explore Departure Data in General
 
 In a first step, we can explore our dataset and its characteristics. 
@@ -85,8 +72,7 @@ Next, we can look at how many flights were *planned* to took off from Munich Air
 Here it can be seen that in 2020, the year that was strongly influenced by the pandemic, there was a decrease in flights.
 
 ```{r}
-# Let's only consider months for which data is available for each day. 
-flight_count_departure <- departure_data[!(format(departure_data$departure_scheduled_datetime_local, "%Y-%m") %in% c("2017-09", "2023-05")), ] %>%
+flight_count_departure <- departure_data %>%
   group_by(departure_scheduled_month_year_local) %>%
   summarise(count = n())
 
@@ -324,16 +310,14 @@ If one looks at the low temperature, then a valley, which can be seen even more 
 
 ```{r}
 average_delay_templow <- delay_departure_data %>%
-  group_by(templow) %>%
+  group_by(temperature_celsius_low) %>%
   summarize(average_delay = mean(delay_departure_min))
 
-ggplot(average_delay_templow, aes(x = templow, y = average_delay)) +
+ggplot(average_delay_templow, aes(x = temperature_celsius_low, y = average_delay)) +
   geom_bar(stat = "identity", fill = "steelblue") +
   labs(x = "Low Temperature", y = "Average Departure Delay (Minutes)") +
   ggtitle("Influence of Low Temperature on Departure Delay")
 ```
-
-If one looks at the wind speed, rather fewer differences are discernible
 
 ```{r}
 average_delay_wind <- delay_departure_data %>%
