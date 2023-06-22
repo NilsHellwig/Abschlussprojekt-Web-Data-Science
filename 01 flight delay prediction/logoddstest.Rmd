@@ -1,0 +1,62 @@
+
+```{r}
+library(gutenbergr)
+library(tidytext)
+library(ggplot2)
+
+books<- gutenberg_download(c(30775, 33504), meta_fields = "author")
+
+by_words<-books %>% 
+   unnest_tokens(word, text) %>% 
+   filter(!word %in% stop_words$word,
+         str_detect(word, "[a-z]")) %>% 
+   mutate(word = str_remove_all(word, "_")) %>% 
+   separate(author, into = c("scientist"), sep = ",",extra = "drop") %>% 
+   count(scientist, word, sort = TRUE)
+
+top_words <- by_words %>%
+  group_by(scientist) %>%
+  top_n(10, n) %>%
+  ungroup() %>%
+  mutate(word = fct_reorder(word, n))
+
+plot_top_10_words <- ggplot(top_words, aes(word, n, fill = scientist)) +
+  geom_col(show.legend = FALSE) +
+  geom_text(aes(label = n), size = 3, fontface = "bold", hjust = 2) +
+  coord_flip() +
+  facet_wrap(~scientist, scales = "free_y") +
+  labs(
+    title = "Showing top 10 words used by each scientist",
+    x = "Top 10 most frequent words",
+    y = "Times the words used"
+  )
+
+print(plot_top_10_words)
+
+
+log_odds <- by_words %>%
+  spread(scientist, n, fill = 0) %>%
+  mutate_if(is.numeric, funs((. + 1) / (sum(. + 1)))) %>%
+  mutate(logratio = log(Lavoisier / Newton)) %>%
+  group_by(logratio > 0) %>%
+  top_n(10, abs(logratio)) %>%
+  ungroup() %>%
+  mutate(word = fct_reorder(word, logratio))
+```
+
+
+```{r}
+print(log_odds)
+
+plot_log_odds <- ggplot(log_odds, aes(word, logratio, fill = logratio > 0)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  labs(
+    title = "Showing Log Odds Ratio between words from 2 books",
+    x = "",
+    y = "Log Ratio with opposite direction"
+  )
+
+plot_log_odds 
+```
+

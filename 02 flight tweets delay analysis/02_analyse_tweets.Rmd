@@ -12,13 +12,15 @@ library(stringr)
 library(tm)
 library(SnowballC)
 library(sentimentr)
+library(tidytext)
+library(ggplot2)
 ```
 
 ## Load Data
 
 ```{r}
 departure_data <- read.csv("../datasets/departure_dataset.csv")
-flight_tweets <- read.csv("../datasets/flight_tweets.csv")
+flight_tweets <- read.csv("../datasets/flight_tweets_200k.csv")
 ```
 
 I decided to only consider German and English tweets, as it would be difficult to apply all the necessary pre-processing steps in all the languages that occur. Considering tweets that are German or English, a large proportion of tweets are still considered.
@@ -33,6 +35,34 @@ print(nrow(flight_tweets))
 head(flight_tweets)
 ```
 
+Apparently, there were some tweets collected for flight numbers BG1 and flight numbers starting with FX that were not related to the flight at all, but were related to an online game.
+
+```{r}
+head(flight_tweets[flight_tweets$flight_number == "BG1", ])
+```
+
+So let's remove them:
+
+```{r}
+flight_tweets <- flight_tweets %>%
+  filter(!((str_detect(content, regex("dnd", ignore_case = TRUE)) 
+                                     | str_detect(content, regex("Baldur", ignore_case = TRUE))
+                                     | str_detect(content, regex("trading", ignore_case = TRUE))
+                                     | str_detect(content, regex("pinball", ignore_case = TRUE))
+                                     | str_detect(content, regex("sony", ignore_case = TRUE))            
+                                     | str_detect(content, regex("Balder", ignore_case = TRUE))
+                                     | str_detect(content, regex("Ball that started it all!", ignore_case = TRUE))
+                                     | str_detect(content, regex("Claim FREE", ignore_case = TRUE)))))
+
+head(flight_tweets[flight_tweets$flight_number == "BG1", ])
+```
+
+```{r}
+flight_tweets %>%
+  filter(((str_detect(content_cleaned, "gear"))))
+```
+
+
 ## Remove Outliers
 
 As with the data from flightera, I will remove the outliers.
@@ -42,6 +72,14 @@ z_scores <- scale(departure_data$delay_departure_min)
 z_threshold <- 3
 outliers_departure_data<- abs(z_scores) > z_threshold
 departure_data <- departure_data[!outliers_departure_data, ]
+```
+
+## Get Class Labels
+
+```{r}
+category_names_quantiles <- c("ShortOrNoDelay", "LongDelay")
+category_quantiles <- quantile(departure_data$delay_departure_min, probs = c(0.0, 0.5, 1.0))
+category_quantiles
 ```
 
 ## Remove Frequent Users
@@ -87,7 +125,9 @@ Calculate what the average delay is for each of the airlines
 ```{r}
 flights_metadata <- departure_data %>%
   group_by(flight_number) %>%
-  summarize(count = n(), avg_delay_min = mean(delay_departure_min)) 
+  summarize(count = n(), avg_delay_min = mean(delay_departure_min)) %>%
+  mutate(delay_class = cut(avg_delay_min, breaks = category_quantiles, labels = category_names_quantiles, include.lowest = TRUE))
+
 head(flights_metadata)
 ```
 ## Check Correlation between Sentiment and Delay
@@ -127,6 +167,18 @@ correlation_test <- cor.test(flight_tweets$sentiment_score, flight_tweets$avg_de
 correlation_test
 ```
 
+```{r}
+correlation <- cor(flights_metadata$count, flights_metadata$avg_delay_min, use = "complete.obs", method = "pearson")
+plot(flights_metadata$count, flights_metadata$avg_delay_min, xlab = "Count", ylab = "Average Delay (minutes)", main = "Count vs. Average Delay")
+abline(lm(avg_delay_min ~ count, data = flights_metadata), col = "red")
+```
+
+```{r}
+correlation_test <- cor.test(flights_metadata$count, flights_metadata$avg_delay_min, method = "pearson")
+correlation_test
+```
+
+
 Most frequent words
 
 ```{r}
@@ -147,5 +199,50 @@ bigram_frequencies <- bigrams %>%
   count(bigram, sort = TRUE)
 
 bigram_frequencies
+```
+## Log Odds Ratio
+
+```{r}
+flight_tweets
+```
+
+Source used: https://yalagiants.netlify.app/2019/07/log-odds-ratio-vs-tf-idf-vs-weighted-log-odds/ 
+
+```{r, fig.width = 5, fig.height= 6}
+by_words<-flight_tweets %>% 
+   unnest_tokens(word, content_cleaned) %>% 
+   count(delay_class, word, sort = TRUE)
+
+log_odds <- by_words %>%
+  spread(delay_class, n, fill = 0) %>%
+  mutate_if(is.numeric, funs((. + 1) / (sum(. + 1)))) %>%
+  mutate(logratio = log(ShortOrNoDelay / LongDelay)) %>%
+  group_by(logratio > 0) %>%
+  top_n(40, abs(logratio)) %>%
+  ungroup() %>%
+  mutate(word = fct_reorder(word, logratio))
+
+print(log_odds)
+
+plot_log_odds <- ggplot(log_odds, aes(word, logratio, fill = logratio > 0)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  labs(
+    title = "Showing Log Odds Ratio between words from 2 books",
+    x = "",
+    y = "Log Ratio with opposite direction"
+  )
+
+plot_log_odds 
+```
+There were apparently some tweets about flight number BG1 that were not related to the flight at all, but were related to an online game.
+
+```{r}
+flight_tweets %>%
+  filter(str_detect(content_cleaned, "baldur"))
+```
+
+```{r}
+flight_tweets
 ```
 
