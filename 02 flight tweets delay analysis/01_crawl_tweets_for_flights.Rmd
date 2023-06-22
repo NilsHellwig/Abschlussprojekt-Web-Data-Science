@@ -24,8 +24,10 @@ Due to the fact that this is a Python-based tool, it is necessary to install it 
 use_condaenv("/opt/conda")
 ```
 
+I have personally experienced that the version of snscrape installed via `pip install snscrpape` is not the latest one available in the official GitHub repo. The latest version that could be installed via pip as of 21 June 2023 resulted in a "missing token" error, whereas the latest version on GitHub worked without problems.
+
 ```{r}
-system("pip install snscrape", intern=TRUE)
+system("pip install git+https://github.com/JustAnotherArchivist/snscrape.git", intern=TRUE)
 ```
 
 ## Load Dataset
@@ -33,7 +35,7 @@ system("pip install snscrape", intern=TRUE)
 The flight numbers that occur in the main data set are to be considered, whereby only tweets from the period for which I have also collected tweets are to be collected.
 
 ```{r}
-departure_data <- read.csv("datasets/departure_dataset.csv")
+departure_data <- read.csv("../datasets/departure_dataset.csv")
 ```
 
 ```{r}
@@ -66,7 +68,7 @@ for (flight_number in flight_numbers) {
   
   print(twitter_search_prompt)
 
-  path_save <- paste0("datasets/flight_tweets/tweets_", flight_number, ".json")
+  path_save <- paste0("../datasets/flight_tweets/tweets_", flight_number, ".json")
   command <- paste0("snscrape --jsonl --progress --max-results 10000"," twitter-search ", twitter_search_prompt, " > ", path_save)
 
   system(command)
@@ -102,7 +104,7 @@ Now I read down all the .json files to compile the most important information of
 tweets_df <- data.frame()
 
 for (flight_number in flight_numbers) {
-  file_name <- paste0("datasets/flight_tweets/tweets_", flight_number, ".json")
+  file_name <- paste0("../datasets/flight_tweets/tweets_", flight_number, ".json")
   json_string <- convertToValidJSONString(file_name)
   if (json_string != FALSE) {
      tweets <- as.data.frame(fromJSON(json_string)[c("username", "url", "date", "content", "replyCount", "retweetCount", "likeCount", "quoteCount", "lang", "viewCount", "bookmarkCount")])
@@ -115,7 +117,7 @@ for (flight_number in flight_numbers) {
 tweets_df <- tweets_df %>%
   arrange(date)
 
-write.csv(tweets_df, file = "datasets/flight_tweets.csv", row.names = FALSE)
+write.csv(tweets_df, file = "../datasets/flight_tweets.csv", row.names = FALSE)
 
 head(tweets_df)
 ```
