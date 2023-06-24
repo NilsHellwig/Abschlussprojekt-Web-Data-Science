@@ -21,7 +21,7 @@ library(tidyr)
 Due to the fact that this is a Python-based tool, it is necessary to install it using Python.
 
 ```{r}
-use_condaenv("/opt/conda")
+use_condaenv("/opt/homebrew/Caskroom/miniforge/base/envs/tensorflow_m1")
 ```
 
 I have personally experienced that the version of snscrape installed via `pip install snscrpape` is not the latest one available in the official GitHub repo. The latest version that could be installed via pip as of 21 June 2023 resulted in a "missing token" error, whereas the latest version on GitHub worked without problems.

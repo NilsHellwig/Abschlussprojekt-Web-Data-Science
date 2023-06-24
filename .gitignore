@@ -1,2 +1,6 @@
 datasets/
 .Rproj.user
+.DS_Store
+.RData
+.Rhistory
+01 flight delay prediction/01 flight delay prediction.Rproj
