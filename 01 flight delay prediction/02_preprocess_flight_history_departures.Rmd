@@ -7,7 +7,7 @@ output: html_document
 
 # Notebook: Create Dataset with Departures
 
-This notebook is used to preprocess the downloaded .html files of the departure flights to assemble them into a neatly formatted dataframe. This script takes about an hour to run (at least that was the case with my M1 MacBook). This is not due to the use of for loops, this is due to many regular expressions used to extract the flight data.
+This notebook is used to preprocess the downloaded .html files of the departure flights to assemble them into a neatly formatted dataframe. This script takes about an hour to run (at least with my M1 MacBook).
 
 ## Load Packages
 
@@ -36,6 +36,8 @@ html_documents <- list.files(path = folder_path_departures, pattern = "\\.html$"
 head(html_documents)
 ```
 
+### Store collected data to dataframe departure_data
+
 ```{r}
 departure_data <- data.frame(
   departure_scheduled_datetime_local = character(),
@@ -60,17 +62,15 @@ departure_data <- data.frame(
 )
 ```
 
-### Store collected data to dataframe departure_data
-
 ```{r}
 # Load each .html-document
 for (i in seq_along(html_documents)) {
   doc_path <- html_documents[i]
   doc <- read_html(doc_path)
   
-  # The flight data for the flights are located within the <tbody> element. Each flight is 
-  # within a <tr> element that has either the class bg-gray-50 or bg-white. 
-  # The class was added as a condition, because there can be other <tr> elements within the <tbody> element, but they do not contain flight data.
+  # The flight data for the flights are located within the '<tbody>' element. Each flight is 
+  # within a '<tr>' element that has either the class "bg-gray-50" or "bg-white". 
+  # The class was added as a condition, because there can be other '<tr>' elements within the <tbody> element, but they do not contain flight data.
   extracted_data <- doc %>%
     html_nodes("tbody tr.bg-gray-50, tbody tr.bg-white")
   
@@ -78,7 +78,7 @@ for (i in seq_along(html_documents)) {
       # Let's start by storing all innerHTML of the child elements of a flight's flight_element.
       # In each child element there is metadata about a flight. I hoped that each child element would have an id/class with 
       # which to extract the corresponding metadata, but unfortunately this was not the case. However, I noticed that 
-      # the index or the order of the child_elements is sufficient to know which child element contains which information. 
+      # the index or the order of the child elements within a flight_element is sufficient to know which child element contains which information. 
       # For example, child_elements[2] always contains the airline code and airline name for each flight. airline code 
       # and airline name then only have to be extracted using regular expressions.
       child_elements <- flight_element %>%
@@ -86,6 +86,7 @@ for (i in seq_along(html_documents)) {
         html_text() %>%
         trimws() # remove whitespaces
       
+      # The image of a flight is used to identify the destination country / airline country      
       flag_imgs <- flight_element %>%
          html_nodes("img[alt*='Flag for']")
 
@@ -179,7 +180,7 @@ for (i in seq_along(html_documents)) {
 
 ### Further Preprocessing of the dataset
 
-If there are not at least 30 flights available for an hour on flightera.com, flights for more than the randomly selected hour may be crawled. In rare cases duplicates may occur in case the upcoming hour was also randomly selected.
+If there are not at least 30 flights available for an hour on flightera.com, flights for more than the randomly selected hour may be crawled. In rare cases duplicates may occur in case the upcoming hour was also randomly selected for data collection.
 
 ```{r}
 duplicate_rows <- departure_data[duplicated(departure_data), ]
