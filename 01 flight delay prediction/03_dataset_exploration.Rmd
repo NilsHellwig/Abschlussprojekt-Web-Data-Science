@@ -22,7 +22,7 @@ departure_data <- read.csv("../datasets/departure_dataset.csv")
 weather_data <- read.csv("../datasets/weather_munich_dataset.csv")
 ```
 
-For better data handling, I convert the columns with time data to PISIXct.
+For better data handling, I will convert the columns with time data to POSIXct
 
 ```{r}
 departure_data$departure_scheduled_datetime_local <- as.POSIXct(departure_data$departure_scheduled_datetime_local)
@@ -42,10 +42,11 @@ merge_cols_weather_data <- setdiff(names(weather_data), c("date", "six_hours_sta
 departure_data <- merge(departure_data, weather_data[, c(merge_cols_weather_data)], by.x = "six_hours_starting_from_datatime", by.y = "six_hours_starting_from_datatime", all.x = TRUE)
 head(departure_data)
 ```
+
 ### Explore Departure Data in General
 
-In a first step, we can explore our dataset and its characteristics. 
-It is always important to note that our dataset is only a sample. For each day between 18.09.2017 and 15.05.2023 flights that took off/landed in Munich were collected by flightera.org, whereby the flights were only collected for two random hours of each day (see 01_... notebooks).
+In a first step, we can explore the dataset and its characteristics. 
+For every analysis, it's important to keep in mind, that the dataset is only a radnom sample as I only collected data for four random hours of each day (see 01_... notebooks). For each day between 01.10.2017 and 31.05.2023 flights that took off in Munich were collected from flightera.org.
 Now, we can have a look at how many flights have landed, were diverted etc. (occurrences of the various flight statuses)
 
 ```{r}
@@ -69,7 +70,7 @@ ggplot(flight_status_count, aes(x = departure_scheduled_month_local, y = count, 
 ```
 
 Next, we can look at how many flights were *planned* to took off from Munich Airport in the period for which the data was collected for.
-Here it can be seen that in 2020, the year that was strongly influenced by the pandemic, there was a decrease in flights.
+Here it can be seen that in 2020, the year that was strongly influenced by the pandemic, there was a decrease in the amount of flights.
 
 ```{r}
 flight_count_departure <- departure_data %>%
@@ -109,7 +110,7 @@ ggplot(top_20_airlines_departure, aes(x = reorder(airline_name, -percentage), y 
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
-Finally, you can also take a look at the airports to which there are the most frequent flights from Munich.
+You can also look at which airports are the most frequent destinations among flights departing from Munich
 
 ```{r}
 destinations <- departure_data %>%
@@ -119,6 +120,8 @@ destinations <- departure_data %>%
 
 head(destinations, n=20)
 ```
+
+... or by country
 
 ```{r}
 top_20_destinations_departure <- departure_data %>%
@@ -133,7 +136,7 @@ ggplot(top_20_destinations_departure, aes(x = reorder(destination_country, -perc
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
-### Feature Exploration 
+### Feature Exploration / Prediction Target
 
 Next, I can look at which columns are possible predictors. 
 
@@ -151,16 +154,20 @@ Next, we can examine how often and how much delayed flights are taking off from 
 z_scores <- scale(delay_departure_data$delay_departure_min)
 z_threshold <- 3
 outliers <- abs(z_scores) > z_threshold
+outlier_data <- delay_departure_data[outliers, ]
 delay_departure_data <- delay_departure_data[!outliers, ]
+
+# Among the collected flights there were some with more than one day of delay (>1440 minutes)
+head(outlier_data[order(-outlier_data$delay_departure_min), ])[, c("delay_departure_min", "departure_scheduled_datetime_utc", "destination_name")]
 ```
 
 ```{r}
 delay_departure_data <- delay_departure_data[delay_departure_data$flight_status == "Landed", ]
 ```
 
-### Prediction target
+#### Prediction target
 
-Between the 0.2 and the 0.8 quantile the slope is fairly constant, while between the 0.8 and the 1.0 qunatil one can see a clear increase. Between the 0.0 and the 0.2 quantile, the slope is at 0 for some time, which can be explained by the fact that many flights have exactly 0 minutes delay.
+Between the 0.2 and the 0.8 quantile the slope is fairly constant, while between the 0.8 and the 1.0 quantile, one can see a clear increase. Between the 0.0 and the 0.2 quantile, the slope is at 0 for some time, which can be explained by the fact that many flights have exactly 0 minutes delay.
 
 ```{r}
 summary(delay_departure_data$delay_departure_min)
@@ -175,7 +182,6 @@ plot(seq(0, 1, by = step), category_quantiles, type = "l",
       ylim = c(-50, 50)
     )
      
-
 grid()
 legend("topleft", legend = "Quantile", lty = 1, col = "blue")
 ```
@@ -192,7 +198,7 @@ quantiles <- quantile(delay_departure_data$delay_departure_min, probs = c(0.0, 0
 quantiles
 ```
 
-### Distribution of Departure Delay
+#### Feature Exploration
 
 Among other things, you can see, there are some flights with 0 minutes delay (="on time"):
 
@@ -237,7 +243,7 @@ class_counts_each_month_and_year <- delay_departure_data %>%
 class_counts_each_month_and_year
 ```
 
-There seems to be a difference in how much the average delay is depending on the month.
+There also seems to be a difference in how much the average delay is depending on the month
 
 ```{r}
 ggplot(delay_departure_data, aes(x = as.factor(departure_scheduled_month_local), y = delay_departure_min)) +
@@ -255,15 +261,9 @@ ggplot(delay_departure_data %>% filter(departure_scheduled_year_local %in% years
   geom_boxplot() +
   labs(x = "Month", y = "Delay (Minutes)", title = "Distribution of Delay per Month [without 2020 and 2021]") +
   coord_cartesian(ylim = c(0, 100))
-
 ```
 
-Furthermore, there also seems to be differences depending on the time of day (hour of the day) as to how severe the delay of the departure of flights is. 
-
-```{r}
-delay_departure_data
-```
-
+In addition, there also seem to be differences depending on the time of day (hour) as to how long the delay is when flights depart. 
 
 ```{r}
 ggplot(delay_departure_data, aes(x = as.factor(departure_scheduled_hour_local), y = delay_departure_min)) +
@@ -271,8 +271,12 @@ ggplot(delay_departure_data, aes(x = as.factor(departure_scheduled_hour_local), 
   labs(x = "Hour", y = "Delay (Minutes)", title = "Distribution of delay at different times of the day") +
   coord_cartesian(ylim = c(0, 50))
 ```
+There also seem to be differences depending on the day of the week, with the average delay being lowest on Tuesdays and highest on Fridays.
 
 ```{r}
+delay_departure_data$departure_scheduled_weekday_local <- factor(delay_departure_data$departure_scheduled_weekday_local,
+                                                               levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
+
 ggplot(delay_departure_data, aes(x = departure_scheduled_weekday_local, y = delay_departure_min)) +
   geom_boxplot() +
   labs(x = "Weekday", y = "Delay (Minutes)", title = "Distribution of delay at different weekdays") +
@@ -303,6 +307,8 @@ top_destination_delay <- delay_departure_data %>%
 head(top_destination_delay, n=20)
 ```
 
+##### Weather data
+
 Let's have a look at how the weather might have an influence on delays. Let's have a look the influence of different weather conditions
 
 ```{r}
@@ -326,6 +332,7 @@ ggplot(average_delay_temperature, aes(x = temperature_celsius, y = average_delay
   ggtitle("Influence of Temperature on Departure Delay") +
   coord_cartesian(ylim = c(0, 100))
 ```
+
 If one looks at the low temperature, then a valley, which can be seen even more clearly in the graph above.
 
 ```{r}
@@ -374,6 +381,7 @@ ggplot(average_delay_humidity, aes(x = humidity, y = average_delay)) +
   ggtitle("Influence of Humidity on Departure Delay")
 
 ```
+Looking at barometric pressure, I can personally not see any interessting trends...
 
 ```{r}
 average_delay_baro <- delay_departure_data %>%
