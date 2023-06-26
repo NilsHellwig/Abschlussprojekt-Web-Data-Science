@@ -107,8 +107,7 @@ for (flight_number in flight_numbers) {
   file_name <- paste0("../datasets/flight_tweets/tweets_", flight_number, ".json")
   json_string <- convertToValidJSONString(file_name)
   if (json_string != FALSE) {
-     tweets <- as.data.frame(fromJSON(json_string)[c("username", "url", "date", "content", "replyCount", "retweetCount", "likeCount", "quoteCount", "lang", "viewCount", "bookmarkCount")])
-  
+     tweets <- as.data.frame(fromJSON(json_string)[c("username", "url", "date", "content", "replyCount", "retweetCount", "likeCount", "quoteCount", "lang", "bookmarkCount")])
      tweets$flight_number <- flight_number
      tweets_df <- bind_rows(tweets_df, tweets) 
   }
