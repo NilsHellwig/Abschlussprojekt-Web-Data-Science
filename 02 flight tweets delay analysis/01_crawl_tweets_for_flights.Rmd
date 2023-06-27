@@ -18,7 +18,8 @@ library(tidyr)
 ## Settings
 
 ### Install Snscrape
-Due to the fact that this is a Python-based tool, it is necessary to install it using Python.
+
+Due to the fact that this is a Python-based tool, it is necessary to install it using Python. I will just select my conda environment.
 
 ```{r}
 use_condaenv("/opt/homebrew/Caskroom/miniforge/base/envs/tensorflow_m1")
