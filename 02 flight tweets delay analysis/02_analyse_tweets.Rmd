@@ -14,13 +14,14 @@ library(SnowballC)
 library(sentimentr)
 library(tidytext)
 library(ggplot2)
+library(forcats)
 ```
 
 ## Load Data
 
 ```{r}
 departure_data <- read.csv("../datasets/departure_dataset.csv")
-flight_tweets <- read.csv("../datasets/flight_tweets_200k.csv")
+flight_tweets <- read.csv("../datasets/flight_tweets.csv")
 ```
 
 I decided to only consider German and English tweets, as it would be difficult to apply all the necessary pre-processing steps in all the languages that occur. Considering tweets that are German or English, a large proportion of tweets are still considered.
@@ -56,12 +57,6 @@ flight_tweets <- flight_tweets %>%
 
 head(flight_tweets[flight_tweets$flight_number == "BG1", ])
 ```
-
-```{r}
-flight_tweets %>%
-  filter(((str_detect(content_cleaned, "gear"))))
-```
-
 
 ## Remove Outliers
 
@@ -201,10 +196,6 @@ bigram_frequencies <- bigrams %>%
 bigram_frequencies
 ```
 ## Log Odds Ratio
-
-```{r}
-flight_tweets
-```
 
 Source used: https://yalagiants.netlify.app/2019/07/log-odds-ratio-vs-tf-idf-vs-weighted-log-odds/ 
 
