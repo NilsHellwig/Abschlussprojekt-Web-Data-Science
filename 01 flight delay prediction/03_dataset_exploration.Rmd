@@ -215,7 +215,7 @@ hist(delay_departure_data$delay_departure_min, breaks = minutes,
 Looking at the average number of minutes of delay for all months, it is noticeable that in the years that were heavily affected by the Covid 19 pandemic (2020 and 2021), the number of minutes of delay was lower than before and after that time. Overall, it can be observed that there are strong differences between the months.
 
 ```{r}
-average_delay_destination_departures <- delay_departure_data %>%
+average_delay_destination_departures <- delay_departure_data[delay_departure_data$flight_number == "XQ131", ] %>%
   group_by(departure_scheduled_month_year_local) %>%
   summarise(avg_delay = mean(delay_departure_min))
 
@@ -294,6 +294,17 @@ top_airlines_delay <- delay_departure_data %>%
 
 head(top_airlines_delay, n=20)
 ```
+
+```{r}
+top_flights_delay <- delay_departure_data %>%
+  group_by(flight_number) %>%
+  summarise(delay_mean = mean(delay_departure_min), delay_median = median(delay_departure_min), count = n()) %>%
+  filter(count >= 365) %>%
+  arrange(-delay_mean)
+
+head(top_flights_delay, n = 20)
+```
+
 
 Next, we can look at whether the destination has an influence. If we look again at destinations that are flown to at least once a day on average, we can see that there are differences.
 

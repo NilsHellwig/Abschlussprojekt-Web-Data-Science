@@ -1,6 +1,6 @@
 # Analyse Tweets
 
-Now that some tweets have been collected, I try to identify anomalies in the dataset.
+Now that some tweets have been collected, I try to identify trends in the data.
 
 ## Load Packages
 
@@ -24,6 +24,31 @@ departure_data <- read.csv("../datasets/departure_dataset.csv")
 flight_tweets <- read.csv("../datasets/flight_tweets.csv")
 ```
 
+## Code
+
+### Remove Outliers
+
+Since I want to use the flight delay data, I remove outliers as I do with the notebooks that use the flight data from `flightera.com`.
+
+```{r}
+z_scores <- scale(departure_data$delay_departure_min)
+z_threshold <- 3
+outliers_departure_data<- abs(z_scores) > z_threshold
+departure_data <- departure_data[!outliers_departure_data, ]
+```
+
+### Get Class Labels
+
+Now I can get the median which will be used to split the data into two parts.
+
+```{r}
+category_names_quantiles <- c("ShortOrNoDelay", "LongDelay")
+category_quantiles <- quantile(departure_data$delay_departure_min, probs = c(0.0, 0.5, 1.0))
+category_quantiles
+```
+
+### Select Tweets that are in German or English
+
 I decided to only consider German and English tweets, as it would be difficult to apply all the necessary pre-processing steps in all the languages that occur. Considering tweets that are German or English, a large proportion of tweets are still considered.
 
 ```{r}
@@ -36,12 +61,16 @@ print(nrow(flight_tweets))
 head(flight_tweets)
 ```
 
+### Remove Further Tweets
+
 Apparently, there were some tweets collected for flight numbers BG1 and flight numbers starting with FX that were not related to the flight at all, but were related to an online game.
 
 ```{r}
 head(flight_tweets[flight_tweets$flight_number == "BG1", ])
 ```
 
+I discovered that there are some keywords that are present when the tweet isn't about the flight. 
+It seemed to me that the most sensible approach would be to remove them based on the occurrence of such keywords.
 So let's remove them:
 
 ```{r}
@@ -57,29 +86,9 @@ flight_tweets <- flight_tweets %>%
 
 head(flight_tweets[flight_tweets$flight_number == "BG1", ])
 ```
+### Remove Frequent Users
 
-## Remove Outliers
-
-As with the data from flightera, I will remove the outliers.
-
-```{r}
-z_scores <- scale(departure_data$delay_departure_min)
-z_threshold <- 3
-outliers_departure_data<- abs(z_scores) > z_threshold
-departure_data <- departure_data[!outliers_departure_data, ]
-```
-
-## Get Class Labels
-
-```{r}
-category_names_quantiles <- c("ShortOrNoDelay", "LongDelay")
-category_quantiles <- quantile(departure_data$delay_departure_min, probs = c(0.0, 0.5, 1.0))
-category_quantiles
-```
-
-## Remove Frequent Users
-
-Some of the tweets were written by accounts that tweet about flights in a partially automated way.
+Some of the tweets were written by accounts that post tweets about flights in a partially automated way (i.e. status updates).
 
 ```{r}
 flights_tweets_most_frequent_users <- flight_tweets %>%
@@ -102,9 +111,9 @@ print(nrow(flight_tweets))
 head(flight_tweets)
 ```
 
-## Dataset Exploration
+### Dataset Exploration: Flights with the most tweets
 
-Now let's explore the dataset. Let's take a look for which airlines the most tweets could be collected.
+Let's take a look for which airlines the most tweets could be collected.
 
 ```{r}
 flights_tweets_most_frequent_flight <- flight_tweets %>%
@@ -115,17 +124,67 @@ flights_tweets_most_frequent_flight <- flight_tweets %>%
 head(flights_tweets_most_frequent_flight, n=20)
 ```
 
-Calculate what the average delay is for each of the airlines
+### Calculate Average Delay for each Ariline
 
 ```{r}
-flights_metadata <- departure_data %>%
+avg_delay_flight_number <- departure_data %>%
   group_by(flight_number) %>%
-  summarize(count = n(), avg_delay_min = mean(delay_departure_min)) %>%
-  mutate(delay_class = cut(avg_delay_min, breaks = category_quantiles, labels = category_names_quantiles, include.lowest = TRUE))
-
-head(flights_metadata)
+  summarize(avg_delay_min = mean(delay_departure_min), count = n())
+head(avg_delay_flight_number)
 ```
-## Check Correlation between Sentiment and Delay
+
+### Calculate Average Delay for each Airline in All Months
+
+I want to assign a delay to each tweet. Based on the tweet text, I cannot tell to which flight on which day a tweet exactly refers and I have not collected flight data for all flights to be able to make an assignment here. Therefore, I always assign the average delay of the flights with the corresponding flight number to a tweet (each tweet is assigned to a flight number).
+
+```{r}
+avg_delay_flight_numbers_year_month <- departure_data %>%
+  group_by(departure_scheduled_month_year_local, flight_number) %>%
+  summarize(avg_delay_min = mean(delay_departure_min))
+head(avg_delay_flight_numbers_year_month)
+```
+
+It can occurs that there were no flights for a flight number in one of the months I am considering (10-2017 to 05-2023). In this case, I have decided to calculate the mean of the delay of the entire dataset but only considering the tweets with the corresponding flight number.
+
+```{r}
+# First, I create a dataframe that has one row for each month and each flight number.
+flights_delay_statistics <- crossing(departure_scheduled_month_year_local = unique(avg_delay_flight_numbers_year_month$departure_scheduled_month_year_local),
+                             flight_number = unique(avg_delay_flight_numbers_year_month$flight_number))
+print(nrow(flights_delay_statistics))
+head(flights_delay_statistics)
+```
+
+```{r}
+flights_delay_statistics <- flights_delay_statistics %>%
+  left_join(avg_delay_flight_numbers_year_month, by = c("departure_scheduled_month_year_local", "flight_number"))
+
+get_average_delay_of_flight_number <- function(flight_numbers) {
+  # Add the average delay of a flight is no flight available in a month for a flight number
+  avg_delays <- sapply(flight_numbers, function(flight_number) {
+    avg_delay_flight_number[avg_delay_flight_number$flight_number == flight_number, ]$avg_delay_min[1]
+  })
+  return(avg_delays)
+}
+
+flights_delay_statistics <- flights_delay_statistics %>%
+  # avg_delay_min is NA if there are no flights for a specifc flight number in a specifc month
+  mutate(avg_delay_min = ifelse(is.na(avg_delay_min), get_average_delay_of_flight_number(flight_number), avg_delay_min)) %>%
+  mutate(delay_class = cut(avg_delay_min, breaks = category_quantiles, labels = category_names_quantiles, include.lowest = TRUE))
+```
+
+Now let's add the calculated average delays to all tweets:
+
+```{r}
+flight_tweets$departure_scheduled_month_year_local <- format(as.Date(flight_tweets$date), "%Y-%m")
+flight_tweets <- inner_join(flight_tweets, flights_delay_statistics, by = c("flight_number", "departure_scheduled_month_year_local"))
+head(flight_tweets)
+```
+
+### Check Correlation between Sentiment and Delay
+
+After adding the average delay of the corresponding flight number in the month in which the tweet was written to each tweet, one can see if there are correlations. First, I check the relationship between the sentiment of the tweets and the delay.
+
+To identify the sentiment of a tweet, I use `sentimentr`. Before that, I delete URLs, apply lowercasing and remove punctuation and numbers.
 
 ```{r}
 flight_tweets <- flight_tweets %>%
@@ -141,20 +200,13 @@ flight_tweets <- flight_tweets %>%
 head(flight_tweets)
 ```
 
-Now you can add an average delay to each tweet and the corresponding flight number.
 
 ```{r}
-flight_tweets <- flight_tweets %>%
-  left_join(flights_metadata, by = c("flight_number" = "flight_number"))
-head(flight_tweets)
-```
-
-```{r}
-plot(flight_tweets$sentiment_score, flight_tweets$avg_delay_min, xlab = "Sentiment Score", ylab = "Average Delay (minutes)", main = "Scatter Plot of Sentiment Score vs. Average Delay")
+plot(flight_tweets$sentiment_score, flight_tweets$avg_delay_min, xlab = "Sentiment Score", ylab = "Average Delay (Minutes)", main = "Sentiment Score vs. Average Delay")
 abline(lm(avg_delay_min ~ sentiment_score, data = flight_tweets), col = "red")
 ```
 
-Let's calculate the Pearson correlation coefficient between the sentiment scores and average delay times. The correlation is not statistically significant (p-value = 0.8378), indicating that there is no strong linear relationship between the sentiment scores and average delay times. In conclusion, based on this analysis, there is no evidence to suggest a meaningful relationship between sentiment scores and average delay times in flight_tweets.
+Let's calculate the Pearson correlation coefficient between the sentiment scores and average delay times. The correlation is not statistically significant (p-value = 0.1249), indicating that there is no strong linear relationship between the sentiment scores and average delay times. 
 
 ```{r}
 # t-test for correlation coefficients
@@ -162,19 +214,28 @@ correlation_test <- cor.test(flight_tweets$sentiment_score, flight_tweets$avg_de
 correlation_test
 ```
 
-```{r}
-correlation <- cor(flights_metadata$count, flights_metadata$avg_delay_min, use = "complete.obs", method = "pearson")
-plot(flights_metadata$count, flights_metadata$avg_delay_min, xlab = "Count", ylab = "Average Delay (minutes)", main = "Count vs. Average Delay")
-abline(lm(avg_delay_min ~ count, data = flights_metadata), col = "red")
-```
+I also check whether there is a significant difference in the average flight delay of a flight number depending on how many tweets were written about a flight number.
 
 ```{r}
-correlation_test <- cor.test(flights_metadata$count, flights_metadata$avg_delay_min, method = "pearson")
+correlation <- cor(avg_delay_flight_number$count, avg_delay_flight_number$avg_delay_min, use = "complete.obs", method = "pearson")
+plot(avg_delay_flight_number$count, avg_delay_flight_number$avg_delay_min, xlab = "# Tweets Posted for a Flight Number", ylab = "Average Delay (Minutes)", main = "Tweets Posted for a Flight Number vs. Average Delay")
+abline(lm(avg_delay_min ~ count, data = avg_delay_flight_number), col = "red")
+```
+
+I also check whether there is a correlation between the number of tweets posted mentioning a flight number and the average delay of a flight number.
+
+```{r}
+correlation_test <- cor.test(avg_delay_flight_number$count, avg_delay_flight_number$avg_delay_min, method = "pearson")
 correlation_test
 ```
 
+There seems to be a very weak positive correlation (correlation coefficient of 0.013) between the number of tweets mentioning a flight number and the average delay of flights. However, the p-value of 0.5247 suggests that this correlation is not statistically significant. 
+
+### Word Frequencies
 
 Most frequent words
+
+For the sake of completeness, you can also display which words occur very frequently in the tweets.
 
 ```{r}
 all_tokens <- flight_tweets %>%
@@ -183,8 +244,9 @@ all_tokens <- flight_tweets %>%
 word_frequencies <- all_tokens %>%
   count(word, sort = TRUE)
 
-word_frequencies
+head(word_frequencies, n=40)
 ```
+You can also take a look at bigrammes.
 
 ```{r}
 bigrams <- flight_tweets %>%
@@ -193,47 +255,51 @@ bigrams <- flight_tweets %>%
 bigram_frequencies <- bigrams %>%
   count(bigram, sort = TRUE)
 
-bigram_frequencies
+head(bigram_frequencies, n=40)
 ```
-## Log Odds Ratio
+### Log Odds Ratio
 
-Source used: https://yalagiants.netlify.app/2019/07/log-odds-ratio-vs-tf-idf-vs-weighted-log-odds/ 
+Since it was not possible to identify a correlation, I will now use log odds ratio to see if there are tokens that occur particularly frequently in the 'ShortOrNoDelay' or 'LongDelay' class (seperated by Median before).
 
-```{r, fig.width = 5, fig.height= 6}
-by_words<-flight_tweets %>% 
+Source used: https://yalagiants.netlify.app/2019/07/log-odds-ratio-vs-tf-idf-vs-weighted-log-odds/ (see chapter "1. Log Odds Ratio")
+
+```{r}
+# First, we need to calculate the frequency of each token within each of the two classes
+word_freqs <- flight_tweets %>% 
    unnest_tokens(word, content_cleaned) %>% 
    count(delay_class, word, sort = TRUE)
 
-log_odds <- by_words %>%
+head(word_freqs)
+```
+
+```{r}
+log_odds <- word_freqs %>%
   spread(delay_class, n, fill = 0) %>%
-  mutate_if(is.numeric, funs((. + 1) / (sum(. + 1)))) %>%
+  mutate_if(is.numeric, list(~ (. + 1) / (sum(. + 1)))) %>%
   mutate(logratio = log(ShortOrNoDelay / LongDelay)) %>%
   group_by(logratio > 0) %>%
-  top_n(40, abs(logratio)) %>%
+  top_n(50, abs(logratio)) %>%
   ungroup() %>%
   mutate(word = fct_reorder(word, logratio))
 
-print(log_odds)
+head(log_odds)
+```
 
+If you look at the tokens with the highest or lowest log odds values, you can hardly see any words where you would assume that they indicate a lower/higher delay of departure. Among the terms with the lowest log odds values (red bars, class "LongDelay"), however, one can still find a few tokens, including "langste", "helped", "trotz", although these primarily have a negative connotations and do not quite clearly refer to the topic of delayed departure.
+
+```{r, fig.width = 8, fig.height= 13}
+# If logratio > 0, this means that the ratio of the probability of the word occurring in the "ShortOrNoDelay" category compared to the "LongDelay" category is positive.
 plot_log_odds <- ggplot(log_odds, aes(word, logratio, fill = logratio > 0)) +
-  geom_col(show.legend = FALSE) +
+  geom_col() +
   coord_flip() +
   labs(
-    title = "Showing Log Odds Ratio between words from 2 books",
-    x = "",
-    y = "Log Ratio with opposite direction"
-  )
-
-plot_log_odds 
+    title = "Log Odds Ratio Between ShortOrNoDelay (Blue) and LongDelay (Red)",
+    x = "Token",
+    y = "Log Ratio"
+  ) +
+  scale_fill_manual(values = c("TRUE" = "#006400", "FALSE" = "#640000"),
+                    labels = c("LongDelay", "ShortOrNoDelay"),
+                    name = "Classes") +
+  theme(legend.position = "bottom")
+plot_log_odds
 ```
-There were apparently some tweets about flight number BG1 that were not related to the flight at all, but were related to an online game.
-
-```{r}
-flight_tweets %>%
-  filter(str_detect(content_cleaned, "baldur"))
-```
-
-```{r}
-flight_tweets
-```
-
