@@ -2,6 +2,21 @@
 
 Now that some tweets have been collected, I try to identify trends in the data.
 
+Three correlations will be examined:
+
+Is there a correlation between the sentiment of the tweets and the delay of the flight (flight number) mentioned in the tweet. It should be noted that it is not possible to determine which day the tweet refers to on the basis of the tweet text (in most cases, a flight with a specific flight number takes off on several days, it's not possible to determine which day is meant). 
+
+Therefore I am evaluating:
+
+1. The average delay of the mentioned flight number is assigned to each tweet, calculated from the data of `departure_data`.
+
+2. Each tweet is assigned the average delay of the mentioned flight number in the year and month in which the tweet was posted. For example, if a tweet was posted in January 2021, with the flight number LH1234, then the average delay of LH1234 in January 2021 is assigned to the tweet, calculated on the basis of `departure_data`.
+
+Independently, I am still evaluating: 
+
+3. Is there a correlation between the number of tweets mentioning a flight number and the average delay of the flight (flight number).
+
+
 ## Load Packages
 
 ```{r}
@@ -28,7 +43,7 @@ flight_tweets <- read.csv("../datasets/flight_tweets.csv")
 
 ### Remove Outliers
 
-Since I want to use the flight delay data, I remove outliers as I do with the notebooks that use the flight data from `flightera.com`.
+Since I want to use the flight delay data (`departure_data`), I remove outliers as I do with the notebooks that use the flight data from `flightera.com`.
 
 ```{r}
 z_scores <- scale(departure_data$delay_departure_min)
@@ -86,6 +101,7 @@ flight_tweets <- flight_tweets %>%
 
 head(flight_tweets[flight_tweets$flight_number == "BG1", ])
 ```
+
 ### Remove Frequent Users
 
 Some of the tweets were written by accounts that post tweets about flights in a partially automated way (i.e. status updates).
@@ -113,7 +129,7 @@ head(flight_tweets)
 
 ### Dataset Exploration: Flights with the most tweets
 
-Let's take a look for which airlines the most tweets could be collected.
+Let's take a look for which flight number the most tweets could be collected.
 
 ```{r}
 flights_tweets_most_frequent_flight <- flight_tweets %>%
@@ -124,7 +140,7 @@ flights_tweets_most_frequent_flight <- flight_tweets %>%
 head(flights_tweets_most_frequent_flight, n=20)
 ```
 
-### Calculate Average Delay for each Ariline
+### Calculate Average Delay for each Flight Number
 
 ```{r}
 avg_delay_flight_number <- departure_data %>%
@@ -133,7 +149,7 @@ avg_delay_flight_number <- departure_data %>%
 head(avg_delay_flight_number)
 ```
 
-### Calculate Average Delay for each Airline in All Months
+### Calculate Average Delay for each Flight Number in All Months
 
 I want to assign a delay to each tweet. Based on the tweet text, I cannot tell to which flight on which day a tweet exactly refers and I have not collected flight data for all flights to be able to make an assignment here. Therefore, I always assign the average delay of the flights with the corresponding flight number to a tweet (each tweet is assigned to a flight number).
 
