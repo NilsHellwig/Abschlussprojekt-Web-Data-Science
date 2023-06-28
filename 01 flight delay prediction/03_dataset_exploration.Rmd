@@ -43,7 +43,7 @@ departure_data <- merge(departure_data, weather_data[, c(merge_cols_weather_data
 head(departure_data)
 ```
 
-### Explore Departure Data in General
+### Explore Overall Departure Data
 
 In a first step, we can explore the dataset and its characteristics. 
 For every analysis, it's important to keep in mind, that the dataset is only a radnom sample as I only collected data for four random hours of each day (see 01_... notebooks). For each day between 01.10.2017 and 31.05.2023 flights that took off in Munich were collected from flightera.org.
@@ -60,16 +60,18 @@ flight_status_count <- departure_data %>%
   group_by(departure_scheduled_year_local, departure_scheduled_month_local, flight_status) %>%
   summarise(count = n())
 
+month_labels <- c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
 ggplot(flight_status_count, aes(x = departure_scheduled_month_local, y = count, fill = flight_status)) +
   geom_bar(stat = "identity", position = "stack") +
   facet_wrap(~departure_scheduled_year_local, ncol = 1) +
   xlab("Month") +
   ylab("# Flights") +
-  ggtitle("Distribution of Flight Status by Month (Year-wise)")
-
+  ggtitle("Distribution of Flight Status by Month (Year-wise)") +
+  scale_x_continuous(breaks = 1:12, labels = month_labels)
 ```
 
-Next, we can look at how many flights were *planned* to took off from Munich Airport in the period for which the data was collected for.
+Next, we can look at how many flights were *planned* to take off in the period for which the data was collected for.
 Here it can be seen that in 2020, the year that was strongly influenced by the pandemic, there was a decrease in the amount of flights.
 
 ```{r}
@@ -133,6 +135,7 @@ top_20_destinations_departure <- departure_data %>%
 ggplot(top_20_destinations_departure, aes(x = reorder(destination_country, -percentage), y = percentage)) +
   geom_bar(stat = "identity", fill = "steelblue") +
   labs(x = "Destination (Country)", y = "% All Collected Flights", title = "Most frequent destinations from Munich Airport") +
+  # by changing the angle of the labels by 45° it's much easier to read them
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
@@ -335,7 +338,7 @@ We can also look at how temperature affects departure delays. The values of the 
 ```{r}
 average_delay_temperature <- delay_departure_data %>%
   group_by(temperature_celsius) %>%
-  summarize(average_delay = mean(delay_departure_min), count = n())
+  summarize(average_delay = mean(delay_departure_min, na.rm = TRUE), count = n())
 
 ggplot(average_delay_temperature, aes(x = temperature_celsius, y = average_delay)) +
   geom_bar(stat = "identity", fill = "steelblue") +
@@ -349,7 +352,7 @@ If one looks at the low temperature, then a valley, which can be seen even more 
 ```{r}
 average_delay_templow <- delay_departure_data %>%
   group_by(temperature_celsius_low) %>%
-  summarize(average_delay = mean(delay_departure_min))
+  summarize(average_delay = mean(delay_departure_min, na.rm = TRUE))
 
 ggplot(average_delay_templow, aes(x = temperature_celsius_low, y = average_delay)) +
   geom_bar(stat = "identity", fill = "steelblue") +
@@ -360,7 +363,7 @@ ggplot(average_delay_templow, aes(x = temperature_celsius_low, y = average_delay
 ```{r}
 average_delay_wind <- delay_departure_data %>%
   group_by(wind_speed_km) %>%
-  summarize(average_delay = mean(delay_departure_min))
+  summarize(average_delay = mean(delay_departure_min, na.rm = TRUE))
 
 ggplot(average_delay_wind, aes(x = wind_speed_km, y = average_delay)) +
   geom_bar(stat = "identity", fill = "steelblue") +
@@ -372,7 +375,7 @@ ggplot(average_delay_wind, aes(x = wind_speed_km, y = average_delay)) +
 ```{r}
 average_delay_wind_direction <- delay_departure_data %>%
   group_by(wind_direction) %>%
-  summarize(average_delay = mean(delay_departure_min))
+  summarize(average_delay = mean(delay_departure_min, na.rm = TRUE))
 
 ggplot(average_delay_wind_direction, aes(x = wind_direction, y = average_delay)) +
   geom_bar(stat = "identity", fill = "steelblue") +
@@ -384,7 +387,7 @@ ggplot(average_delay_wind_direction, aes(x = wind_direction, y = average_delay))
 ```{r}
 average_delay_humidity <- delay_departure_data %>%
   group_by(humidity) %>%
-  summarize(average_delay = mean(delay_departure_min))
+  summarize(average_delay = mean(delay_departure_min, na.rm = TRUE))
 
 ggplot(average_delay_humidity, aes(x = humidity, y = average_delay)) +
   geom_bar(stat = "identity", fill = "steelblue") +
@@ -397,7 +400,7 @@ Looking at barometric pressure, I can personally not see any interessting trends
 ```{r}
 average_delay_baro <- delay_departure_data %>%
   group_by(baro) %>%
-  summarize(average_delay = mean(delay_departure_min))
+  summarize(average_delay = mean(delay_departure_min, na.rm = TRUE))
 
 ggplot(average_delay_baro, aes(x = baro, y = average_delay)) +
   geom_line(color = "steelblue") +

@@ -6,15 +6,15 @@ Three correlations will be examined:
 
 Is there a correlation between the sentiment of the tweets and the delay of the flight (flight number) mentioned in the tweet. It should be noted that it is not possible to determine which day the tweet refers to on the basis of the tweet text (in most cases, a flight with a specific flight number takes off on several days, it's not possible to determine which day is meant). 
 
-Therefore I am evaluating:
+Therefore, I will be evaluating the following:
 
-1. The average delay of the mentioned flight number is assigned to each tweet, calculated from the data of `departure_data`.
+* RQ1: The average delay of the mentioned flight number is assigned to each tweet, calculated from the data of `departure_data`.
 
-2. Each tweet is assigned the average delay of the mentioned flight number in the year and month in which the tweet was posted. For example, if a tweet was posted in January 2021, with the flight number LH1234, then the average delay of LH1234 in January 2021 is assigned to the tweet, calculated on the basis of `departure_data`.
+* RQ2: Each tweet is assigned the average delay of the mentioned flight number in the year and month in which the tweet was posted. For example, if a tweet was posted in January 2021, with the flight number LH1234, then the average delay of LH1234 in January 2021 is assigned to the tweet, calculated on the basis of `departure_data`.
 
-Independently, I am still evaluating: 
+Furthermore, I will be evaluating:
 
-3. Is there a correlation between the number of tweets mentioning a flight number and the average delay of the flight (flight number).
+* RQ3: Is there a correlation between the number of tweets mentioning a flight number and the average delay of the flight (flight number).
 
 
 ## Load Packages
@@ -76,7 +76,7 @@ print(nrow(flight_tweets))
 head(flight_tweets)
 ```
 
-### Remove Further Tweets
+### Remove Tweets
 
 Apparently, there were some tweets collected for flight numbers BG1 and flight numbers starting with FX that were not related to the flight at all, but were related to an online game.
 
@@ -160,7 +160,7 @@ avg_delay_flight_numbers_year_month <- departure_data %>%
 head(avg_delay_flight_numbers_year_month)
 ```
 
-It can occurs that there were no flights for a flight number in one of the months I am considering (10-2017 to 05-2023). In this case, I have decided to calculate the mean of the delay of the entire dataset but only considering the tweets with the corresponding flight number.
+It might occurs that there were no flights for a flight number in one of the months I am considering (10-2017 to 05-2023). In this case, I have decided to calculate the mean of the delay of the entire dataset but only considering the tweets with the corresponding flight number.
 
 ```{r}
 # First, I create a dataframe that has one row for each month and each flight number.
@@ -190,7 +190,7 @@ flights_delay_statistics <- flights_delay_statistics %>%
 
 Now let's add the calculated average delays to all tweets:
 
-1. Add delay of each flight number based on month/year
+**Add delay of each flight number based on month/year**
 
 ```{r}
 flight_tweets$departure_scheduled_month_year_local <- format(as.Date(flight_tweets$date), "%Y-%m")
@@ -198,7 +198,7 @@ flight_tweets <- inner_join(flight_tweets, flights_delay_statistics, by = c("fli
 head(flight_tweets)
 ```
 
-2. Add delay of each flight number
+**Add delay of each flight number**
 
 ```{r}
 flight_tweets <- inner_join(flight_tweets, avg_delay_flight_number, by = c("flight_number"))
@@ -227,7 +227,7 @@ head(flight_tweets)
 
 ### Analyse Correlations 
 
-#### RQ1 Sentiment of Tweet vs. Average Delay of Flight in Month (in Minutes)
+#### RQ1: Sentiment of Tweet vs. Average Delay of Flight in Month (in Minutes)
 
 ```{r}
 plot(flight_tweets$sentiment_score, flight_tweets$avg_delay_min_flight_number_year_month, xlab = "Sentiment Score", ylab = "Average Delay (Minutes)", main = "Sentiment Score vs. Average Delay\n(Based on Average Delay per Month and Year)")
@@ -241,7 +241,9 @@ correlation_test <- cor.test(flight_tweets$sentiment_score, flight_tweets$avg_de
 correlation_test
 ```
 
-#### RQ2 Sentiment of Tweet vs. Average Delay of Flight (in Minutes)
+#### RQ2: Sentiment of Tweet vs. Average Delay of Flight (in Minutes)
+
+Let's calculate the Pearson correlation coefficient between the `sentiment_score` and `avg_delay_min_flight_number` variables. The correlation is not statistically significant (p-value = 0.9779), indicating that there is no significant relationship between the sentiment scores and average delay times.
 
 ```{r}
 plot(flight_tweets$sentiment_score, flight_tweets$avg_delay_min_flight_number, xlab = "Sentiment Score", ylab = "Average Delay (Minutes)", main = "Sentiment Score vs. Average Delay \n(Based on Average Delay per Month and Year)")
