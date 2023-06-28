@@ -99,7 +99,7 @@ convertToValidJSONString <- function(file_name) {
 }
 ```
 
-Now I read down all the .json files to compile the most important information of the tweet (username, url, date, content etc.) into a single csv file
+Now I will load the .json files to compile the most important information of the tweet (username, url, date, content etc.) into a single csv file
 
 ```{r}
 tweets_df <- data.frame()
