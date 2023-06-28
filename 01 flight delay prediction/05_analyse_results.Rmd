@@ -30,7 +30,7 @@ evaluation_results <- evaluation_results %>%
 evaluation_results[, c("year_month_train", "Accuracy")]
 ```
 
-Compared to the other years, the classification accuracy for the months in 2020 is above 80% in most months and thus very high. It should be noted that in 2020, the delay of departure for the flights that took off from Munich were rather less, which is why the lower class (above the median of the overall dataset) was rather rare. See Notebook 03...
+Compared to the other years, the classification accuracy for the months in 2020 is above 80% in most months and thus very high. Here, it should be noted that in 2020, the delay of departure for the flights that took off from Munich were rather low, which is why the upper class (above the median of the overall dataset) was rather rare in comparison to the lower class (below median of the overall dataset). See Notebook 03_dataset_exploration, which shows that the amount of delay was lower in 2020 comparing it with the amount of delay in the other years.
 
 ```{r, fig.width = 10, fig.height= 3}
 # Date with day is required for visualisation, only year and month can't be transformed into a value of type Date
@@ -71,11 +71,11 @@ metrics
 
 ###  Get Most Important Features
 
-I want to get the features that have the highest average variable importance
+Now, I want to select the features with the highest average variable importance. First of all, I select the columns with the features and it's variable importance scores.
 
 ```{r}
 feature_columns <- evaluation_results[, 24:ncol(evaluation_results)]
-head(feature_columns)
+head(feature_columns[, 1:3])
 ```
 
 ```{r}
@@ -97,7 +97,13 @@ head(selected_feature_timeseries)
 
 ### Create Visualisation for each Year
 
-To visualise the development of the feature importance over time, I create a dataframe with three columns, one with the month/year of the test data that should be evaluated, the airline and the importance of the feature.
+To visualize the development of the feature importance over time, I for each year and month a dataframe (`year_data`) with three columns is created.
+
+Columns:
+
+* the month and year of the test data that should be evaluated
+* the name of the feature
+* the importance of the feature.
 
 ```{r, fig.width = 10, fig.height= 3}
 for (year in unique(year(selected_feature_timeseries$year_month_train_first_day))) {

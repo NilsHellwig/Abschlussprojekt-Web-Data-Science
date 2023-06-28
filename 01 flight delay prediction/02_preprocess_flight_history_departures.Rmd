@@ -213,7 +213,6 @@ departure_data <- departure_data[format(departure_data$departure_scheduled_datet
 head(departure_data)
 ```
 
-
 ```{r}
 write.csv(departure_data, file = "../datasets/departure_dataset.csv", row.names = FALSE)
 ```
