@@ -1,6 +1,6 @@
 # Notebook: Predict Flight Delay
 
-In this notebook, the aim is to predict whether a particular flight has (a) little/no delay or (b) long/very long delay, i.e. a binary classification. Previously, I tried to predict the delay of flights departing between 05/2022 and 05/2023 using the flight data from 10/2017 to 05/2022, also in a binary way. I was able to achieve a very poor accuracy (about 50%). Previously, the data were divided into five different classes using the 0.2-, 0.4-, 0.6- and 0.8-quantiles.
+Now, the aim is to predict whether a particular flight has (a) little/no delay or (b) long/very long delay, i.e. a binary classification. Previously, I tried to predict the delay of flights departing between 05/2022 and 05/2023 using the flight data from 10/2017 to 05/2022, also in a binary way. I was able to achieve a very poor accuracy (about 50%). Previously, the data were divided into five different classes using the 0.2-, 0.4-, 0.6- and 0.8-quantiles (5 classes) whereby the accuracy was also only around 20%.
 
 ## Load Packages
 
@@ -20,9 +20,11 @@ set.seed(42)
 model_name_method <- "rf"
 ```
 
-## Load Datasets
+## Code 
 
-First, we need to load the dataset and add some columns that will be used for feature extraction (as already known from the data exploration script).
+### Load Datasets
+
+First, we need to load the dataset and add some columns that will be used as features (`weather_data`)
 
 ```{r}  
 # Load departure data
@@ -30,14 +32,15 @@ departure_data <- read.csv("../datasets/departure_dataset.csv")
 weather_data <- read.csv("../datasets/weather_munich_dataset.csv")
 head(departure_data)
 ```
-## Convert to POSIXct
+
+### Convert to POSIXct
 
 ```{r}
 departure_data$departure_scheduled_datetime_local <- as.POSIXct(departure_data$departure_scheduled_datetime_local)
 weather_data$six_hours_starting_from_datatime <- as.POSIXct(paste(weather_data$date, weather_data$six_hours_starting_from))
 ```
 
-## Add Weather Data
+### Add Weather Data
 
 ```{r}
 departure_data$six_hours_starting_from_datatime <- as.POSIXct(sapply(departure_data$departure_scheduled_datetime_local, get_weather_data))
@@ -50,8 +53,7 @@ departure_data <- merge(departure_data,
 head(departure_data)
 ```
 
-## Remove Special characters from values
-
+### Remove Special Characters from Values
 
 ```{r}
 # Since there should be a separate column for each value for weather_description later, which then has its value as the column name, I remove all "." and spaces so that you can access the column name later using $ in R.
@@ -67,15 +69,15 @@ head(departure_data)
 departure_data$weather_description <- ifelse(is.na(departure_data$weather_description), "NotSpecified", departure_data$weather_description)
 ```
 
-## Select Flights
+### Select Flights
 
-As I want to predict the amount of delay, I will only look at flights that have landed
+As I want to predict the amount of delay, I will only look at flights that have landed (not canceled, unknown status etc.)
 
 ```{r}
 departure_data <- departure_data[departure_data$flight_status == "Landed", ]
 ```
 
-## Feature Coding
+### Feature Coding
 
 ```{r}
 dataset <- departure_data %>%
@@ -100,8 +102,7 @@ dataset$departure_scheduled_weekday_local <- as.integer(factor(dataset$departure
 ```
 
 ```{r}
-# One-Hot Encoding for categorical variables
-# If MARGIN = 2 is set, this means that the function iterates over the columns of the matrix.
+# One-hot encoding for categorical variables (note for me: 2 means that columns)
 dataset <- cbind(dataset, apply(model.matrix(~ weather_description - 1, data = departure_data), 2, as.integer)) 
 dataset <- cbind(dataset, apply(model.matrix(~ airline_name - 1, data = departure_data), 2, as.integer))
 dataset <- cbind(dataset, apply(model.matrix(~ destination_IATA - 1, data = departure_data), 2, as.integer))
@@ -112,9 +113,9 @@ dataset <- cbind(dataset, apply(model.matrix(~ destination_IATA - 1, data = depa
 head(dataset[, c("weather_descriptionMostlycloudy", "weather_descriptionMorecloudsthansun", "weather_descriptionMild")])
 ```
 
-## Remove Outliers
+### Remove Outliers
 
-There are extreme outliers in the data set. I have no explanation for this, probably some technical problems...
+There are some extreme outliers in the dataset (related to departure delay). I have no explanation for this, probably some technical problems...
 
 ```{r}
 head(dataset[order(dataset$delay_departure_min, decreasing = TRUE), ], 5)[, c("delay_departure_min", "departure_scheduled_datetime_local")]
@@ -124,7 +125,7 @@ head(dataset[order(dataset$delay_departure_min, decreasing = TRUE), ], 5)[, c("d
 head(dataset[order(dataset$delay_departure_min), ], 5)[, c("delay_departure_min", "departure_scheduled_datetime_local")]
 ```
 
-In order to remove the outliers, the code calculates the z-scores for the "delay_departure_min" column in the dataset using the scale() function. The z-score measures how many standard deviations an observation is away from the mean.
+In order to remove outliers, the code calculates the z-scores based on the "delay_departure_min" column in the dataset using the scale() function. The z-score measures how many standard deviations an observation is away from the mean.
 
 ```{r}
 z_scores <- scale(dataset$delay_departure_min)
@@ -133,7 +134,7 @@ outliers_train_df <- abs(z_scores) > z_threshold
 dataset <- dataset[!outliers_train_df, ]
 ```
 
-## Prepare List of Year and Months
+### Prepare List of Year and Months
 
 The model should always be trained with flight data from one month and evaluated with flight data from the following month.
 
@@ -145,7 +146,7 @@ year_month_pairs <- dataset %>%
 head(year_month_pairs)
 ```
 
-## Define Classes
+### Define Classes
 
 ```{r}
 category_names_quantiles <- c("earlier, on time or very short delay", "long delay")
@@ -153,10 +154,9 @@ category_quantiles <- quantile(dataset$delay_departure_min, probs = c(0.0, 0.5, 
 category_quantiles
 ```
 
+### Train Model
 
-## Train Model
-
-### Method to train model
+#### Method to Train Model
 
 ```{r}
 train_model <- function (model_name="rf") {
@@ -173,7 +173,7 @@ train_model <- function (model_name="rf") {
 }
 ```
 
-### Method to evaluate model
+#### Method to Evaluate Model
 
 ```{r}
 evaluate_model <- function (model, test_df) {
@@ -206,7 +206,7 @@ evaluate_model <- function (model, test_df) {
 results_df <- data.frame()
 ```
 
-### Train/Evaluate Model for each month
+#### Train/Evaluate Model for each month
 
 ```{r}
 for (i in seq(1, nrow(year_month_pairs) - 1)) {
@@ -244,7 +244,6 @@ for (i in seq(1, nrow(year_month_pairs) - 1)) {
      test_df[[col]] <- ifelse(is.na(test_df[[col]]), average_value_test, test_df[[col]])
   }
 
-  
   # Train Model
   model <- train_model(model_name=model_name_method)
   
@@ -252,8 +251,6 @@ for (i in seq(1, nrow(year_month_pairs) - 1)) {
   results_df <- evaluate_model(model, test_df)
 }
 ```
-
-
 
 ```{r}
 write.csv(results_df, paste0("results/results_", model_name_method, ".csv"))
