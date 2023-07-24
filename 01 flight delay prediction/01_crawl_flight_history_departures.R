@@ -5,10 +5,10 @@ library(rvest)
 # As downloading takes a long time, I decided to collect flight data for four random hours for each day. 
 # This allowed me to collect around 200,000 flights, which took three full days using this script.
 
-# We first define the URL that serves as the basis for each request. This is either the url for departures or arrivals.
+# We first define the URL that serves as the basis for each request
 base_url_departures <- "https://www.flightera.net/en/airport/Munich/EDDM/departure/"
 
-# These are the days that are available on Flightera.net for both departures and arrivals
+# These are the days that are available on Flightera.net for the departure flights
 days_for_crawling <- as.character(seq(as.Date("2017-10-05"), as.Date("2017-10-20"), by = "day"))
 
 n_hours_to_crawl = 4
