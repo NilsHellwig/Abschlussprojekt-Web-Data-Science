@@ -1,4 +1,4 @@
-# Hinweise:
+# Some Notes
 
 
 1. For both `/01 flight delay prediction` and `/02 flight tweets delay analysis`, I recommend starting with the notebook named with the prefix "01". There is a corresponding .html file for each notebook containing all outputs.
